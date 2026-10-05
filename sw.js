@@ -1,7 +1,7 @@
 const CACHE = 'dropmysong-v7-queue-push';
 const STATIC_ASSETS = [
-  './', './index.html', './dj.html', './css/styles.css',
-  './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/register-sw.js',
+  './', './index.html', './dj.html', './host.html', './css/styles.css',
+  './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/register-sw.js',
   './assets/drop-my-song-logo.png', './assets/icon-192.png', './assets/icon-512.png'
 ];
 
