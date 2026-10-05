@@ -44,7 +44,7 @@ button { cursor: pointer; }
   box-shadow: var(--shadow);
 }
 
-.brand-logo { width: min(260px, 72vw); display: block; }
+.brand-logo { width: min(330px, 76vw); height: auto; display: block; }
 .brand-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
 .app-badge { padding: 8px 12px; border: 1px solid rgba(46,171,255,.35); border-radius: 999px; color: #cfeeff; font-size: .82rem; background: rgba(22,119,255,.08); }
 
@@ -116,8 +116,8 @@ textarea { resize: vertical; }
 
 .dashboard-shell { min-height: 100vh; display: grid; grid-template-columns: 230px 1fr; }
 .sidebar { position: sticky; top: 0; height: 100vh; padding: 22px 16px; border-right: 1px solid rgba(114,140,180,.17); background: rgba(2,5,9,.82); backdrop-filter: blur(16px); display: flex; flex-direction: column; }
-.sidebar-brand img { width: 170px; display: block; }
-.sidebar-brand span { display: block; margin: 8px 0 30px 8px; color: #8e9caf; font-size: .8rem; }
+.sidebar-brand img { width: 190px; height: auto; display: block; }
+.sidebar-brand span { display: block; margin: 2px 0 24px 8px; color: #8e9caf; font-size: .8rem; }
 .sidebar nav { display: grid; gap: 7px; }
 .nav-item { text-align: left; border: 0; border-radius: 12px; padding: 12px 13px; background: transparent; color: #9faabd; font-weight: 700; }
 .nav-item:hover, .nav-item.active { color: white; background: linear-gradient(90deg, rgba(0,194,255,.13), rgba(123,44,255,.12)); border: 1px solid rgba(69,133,255,.18); }
@@ -173,7 +173,7 @@ textarea { resize: vertical; }
   .dashboard-shell { grid-template-columns: 1fr; }
   .sidebar { height: auto; position: static; flex-direction: row; align-items: center; gap: 12px; overflow-x: auto; }
   .sidebar-brand span { display: none; }
-  .sidebar-brand img { width: 120px; }
+  .sidebar-brand img { width: 145px; }
   .sidebar nav { display: flex; }
   .sidebar-logout { margin: 0 0 0 auto; }
   .dashboard-grid { grid-template-columns: 1fr; }
@@ -189,7 +189,7 @@ textarea { resize: vertical; }
   .right-rail { grid-template-columns: 1fr; }
   .events-layout { grid-template-columns: 1fr; }
   .sidebar { padding: 12px; }
-  .sidebar-brand img { width: 95px; }
+  .sidebar-brand img { width: 118px; }
   .nav-item { padding: 9px 10px; white-space: nowrap; }
   .sidebar-logout { padding: 9px 10px; white-space: nowrap; }
   .inline-form { grid-template-columns: 1fr; }

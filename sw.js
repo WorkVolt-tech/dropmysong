@@ -1,8 +1,8 @@
-const CACHE = 'dropmysong-v5-payments';
+const CACHE = 'dropmysong-v6-brand';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/register-sw.js',
-  './assets/dj-maxo-logo.png', './assets/icon-192.png', './assets/icon-512.png'
+  './assets/drop-my-song-logo.png', './assets/icon-192.png', './assets/icon-512.png'
 ];
 
 self.addEventListener('install', event => {
