@@ -648,3 +648,119 @@ a.music-preview:hover {
   .request-card[draggable="true"] { cursor: default; }
   .request-card[draggable="true"] .request-card-head { padding-right: 82px; }
 }
+
+
+/* Drop My Song host access */
+.host-access-panel { grid-column: 1 / -1; }
+.host-access-form {
+  display: grid;
+  grid-template-columns: minmax(0, .7fr) minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 16px;
+}
+.host-login-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 16px 0;
+  padding: 13px;
+  border: 1px solid rgba(129,159,208,.18);
+  border-radius: 14px;
+  background: rgba(5,10,18,.58);
+}
+.host-login-link-row p { margin: 4px 0 0; }
+.host-access-item { margin-top: 8px; }
+
+.host-shell {
+  width: min(1180px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 20px 0 42px;
+}
+.host-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+}
+.host-brand-line { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.host-brand-line img { width: min(220px, 34vw); height: auto; flex: 0 0 auto; }
+.host-brand-line h1 { margin: 2px 0 4px; font-size: clamp(1.5rem, 4vw, 2.25rem); }
+.host-top-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.host-event-bar {
+  margin-top: 14px;
+  padding: 15px 16px;
+  display: grid;
+  grid-template-columns: 1fr minmax(220px, 320px);
+  gap: 14px;
+  align-items: end;
+}
+.host-event-bar h2 { margin: 3px 0 0; }
+.host-event-bar label { margin: 0; }
+.host-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+.host-grid > .panel { padding: 16px; }
+.host-ready-panel { border-color: rgba(0,194,255,.32); }
+.host-submit-panel { grid-column: 1 / -1; }
+.host-call-list { display: grid; gap: 10px; margin-top: 14px; }
+.host-call-card {
+  padding: 14px;
+  border: 1px solid rgba(118,145,188,.2);
+  border-radius: 16px;
+  background: rgba(6,11,19,.8);
+}
+.host-call-card.ready {
+  border-color: rgba(0,194,255,.42);
+  background:
+    linear-gradient(135deg, rgba(0,194,255,.10), rgba(123,44,255,.08)),
+    rgba(6,11,19,.88);
+  box-shadow: 0 0 26px rgba(0,194,255,.07);
+}
+.host-call-card h3 { margin: 10px 0 5px; font-size: 1.35rem; }
+.host-song-line { margin: 0; color: #e6edf7; font-weight: 750; }
+.host-call-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.host-type-badge,
+.host-called-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: .66rem;
+  font-weight: 900;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.host-type-badge {
+  color: #c7ecff;
+  border: 1px solid rgba(0,194,255,.25);
+  background: rgba(0,194,255,.08);
+}
+.host-called-badge {
+  color: #b9f7dd;
+  border: 1px solid rgba(54,219,154,.28);
+  background: rgba(54,219,154,.08);
+}
+.host-called-button { width: 100%; margin-top: 12px; }
+.host-request-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.host-request-links a { text-align: center; text-decoration: none; }
+.host-auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 8px; }
+
+@media (max-width: 760px) {
+  .host-access-form { grid-template-columns: 1fr; }
+  .host-login-link-row { align-items: stretch; flex-direction: column; }
+  .host-topbar { align-items: flex-start; flex-direction: column; }
+  .host-brand-line { width: 100%; align-items: flex-start; }
+  .host-brand-line img { width: 150px; }
+  .host-top-actions { justify-content: flex-start; }
+  .host-event-bar { grid-template-columns: 1fr; }
+  .host-grid { grid-template-columns: 1fr; }
+  .host-submit-panel { grid-column: auto; }
+  .host-request-links, .host-auth-actions { grid-template-columns: 1fr; }
+}
