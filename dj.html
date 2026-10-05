@@ -199,6 +199,34 @@
             <div id="eventsList" class="events-list"></div>
           </section>
 
+          <section class="panel host-access-panel">
+            <p class="eyebrow" data-i18n="dashboard.hostAccessEyebrow">HOST ACCESS</p>
+            <h2 data-i18n="dashboard.hostAccessTitle">Event Host Access</h2>
+            <p id="hostAccessEventName" class="muted" data-i18n="dashboard.selectEventForHost">Select an event to add a host.</p>
+
+            <form id="hostAccessForm" class="host-access-form">
+              <label>
+                <span data-i18n="dashboard.hostName">Host name</span>
+                <input id="hostDisplayName" maxlength="80" placeholder="MC / Host name" />
+              </label>
+              <label>
+                <span data-i18n="dashboard.hostEmail">Host email</span>
+                <input id="hostEmail" type="email" required placeholder="host@example.com" />
+              </label>
+              <button class="primary-button" type="submit" data-i18n="dashboard.addHost">Add Host</button>
+            </form>
+
+            <div class="host-login-link-row">
+              <div>
+                <strong data-i18n="dashboard.hostLoginLink">Host login link</strong>
+                <p class="muted" data-i18n="dashboard.hostLoginCopy">The host signs in here with the email you assign to the event.</p>
+              </div>
+              <button id="copyHostLoginLink" class="secondary-button" type="button" data-i18n="dashboard.copyHostLink">Copy Host Link</button>
+            </div>
+
+            <div id="eventHostsList" class="events-list"></div>
+          </section>
+
           <section class="panel payment-settings-panel">
             <p class="eyebrow" data-i18n="dashboard.paymentSettingsEyebrow">PAYMENTS & TIPS</p>
             <h2 data-i18n="dashboard.paymentSettingsTitle">Selected Event Payment Settings</h2>
