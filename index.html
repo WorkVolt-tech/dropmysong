@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#05070b" />
+  <title>DropMySong — Request a Song</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="guest-body">
+  <main class="guest-shell">
+    <header class="brand-header">
+      <img class="brand-logo" src="./assets/dj-maxo-logo.png" alt="DJ Maxo" />
+      <div class="app-badge">DropMySong</div>
+    </header>
+
+    <section id="eventBanner" class="event-banner hidden"></section>
+
+    <section class="hero-copy">
+      <p class="eyebrow">DROP IT IN THE MIX</p>
+      <h1>Request a Song</h1>
+      <p>Tell DJ Maxo what you want to hear. Artist and song are required.</p>
+    </section>
+
+    <section id="guestNotice" class="notice hidden" aria-live="polite"></section>
+
+    <form id="requestForm" class="panel request-form" novalidate>
+      <label>
+        <span>Artist <strong>*</strong></span>
+        <input id="artist" name="artist" autocomplete="off" maxlength="120" required placeholder="e.g. Drake" />
+      </label>
+
+      <label>
+        <span>Song <strong>*</strong></span>
+        <input id="song" name="song" autocomplete="off" maxlength="160" required placeholder="e.g. God's Plan" />
+      </label>
+
+      <label>
+        <span>Song Link <small>(optional)</small></span>
+        <input id="songUrl" name="songUrl" type="url" inputmode="url" placeholder="YouTube, Spotify, Apple Music, SoundCloud..." />
+      </label>
+
+      <label>
+        <span>Your Name <small>(optional)</small></span>
+        <input id="requesterName" name="requesterName" maxlength="80" placeholder="How should the DJ recognize you?" />
+      </label>
+
+      <label>
+        <span>Message <small>(optional)</small></span>
+        <textarea id="message" name="message" maxlength="200" rows="3" placeholder="Birthday, dedication, specific remix, etc."></textarea>
+        <small class="counter"><span id="messageCount">0</span>/200</small>
+      </label>
+
+      <section id="tipsPanel" class="tip-panel hidden">
+        <div>
+          <strong>Send a tip</strong>
+          <p>Optional — show the DJ some love.</p>
+        </div>
+        <div class="tip-buttons" role="group" aria-label="Tip amount">
+          <button type="button" data-tip="2">$2</button>
+          <button type="button" data-tip="5">$5</button>
+          <button type="button" data-tip="10">$10</button>
+          <button type="button" data-tip="20">$20</button>
+        </div>
+        <input id="tipAmount" type="hidden" value="" />
+      </section>
+
+      <button id="submitButton" class="primary-button" type="submit">Submit Request</button>
+    </form>
+
+    <section id="statusPanel" class="panel status-panel hidden" aria-live="polite">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">YOUR REQUEST</p>
+          <h2 id="statusSong">—</h2>
+        </div>
+        <span id="statusBadge" class="status-pill pending">Pending</span>
+      </div>
+      <p id="statusText" class="muted">Waiting for the DJ.</p>
+      <div id="cantFindHelp" class="cant-find-help hidden">
+        <p>DJ Maxo couldn't find this version. Add a direct song link to help.</p>
+        <div class="inline-form">
+          <input id="helpSongUrl" type="url" placeholder="Paste YouTube / Spotify / other link" />
+          <button id="saveHelpLink" type="button" class="secondary-button">Add Link</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/request.js"></script>
+  <script type="module" src="./js/register-sw.js"></script>
+</body>
+</html>

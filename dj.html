@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#05070b" />
+  <title>DropMySong — DJ Dashboard</title>
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="dashboard-body">
+  <div id="loginView" class="login-shell">
+    <section class="login-card panel">
+      <img class="brand-logo login-logo" src="./assets/dj-maxo-logo.png" alt="DJ Maxo" />
+      <div>
+        <p class="eyebrow">DROPMYSONG</p>
+        <h1>DJ Dashboard</h1>
+        <p class="muted">Sign in with the DJ account you create in Supabase Auth.</p>
+      </div>
+      <form id="loginForm">
+        <label><span>Email</span><input id="loginEmail" type="email" required /></label>
+        <label><span>Password</span><input id="loginPassword" type="password" required /></label>
+        <button class="primary-button" type="submit">Sign In</button>
+      </form>
+      <div id="loginNotice" class="notice hidden"></div>
+    </section>
+  </div>
+
+  <div id="dashboardView" class="dashboard-shell hidden">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img src="./assets/dj-maxo-logo.png" alt="DJ Maxo" />
+        <span>DropMySong</span>
+      </div>
+      <nav>
+        <button class="nav-item active" data-tab="queue">Queue</button>
+        <button class="nav-item" data-tab="played">Played</button>
+        <button class="nav-item" data-tab="events">Events</button>
+      </nav>
+      <button id="logoutButton" class="ghost-button sidebar-logout">Sign Out</button>
+    </aside>
+
+    <main class="dashboard-main">
+      <header class="dashboard-topbar">
+        <div>
+          <p class="eyebrow">LIVE CONTROL</p>
+          <h1>Song Requests <span id="requestCount" class="count-badge">0</span></h1>
+          <p id="activeEventName" class="muted">No active event</p>
+        </div>
+        <div class="topbar-controls">
+          <label class="toggle-card">
+            <span>Requests</span>
+            <input id="requestsToggle" type="checkbox" />
+            <i></i>
+          </label>
+          <label class="toggle-card">
+            <span>Tips</span>
+            <input id="tipsToggle" type="checkbox" />
+            <i></i>
+          </label>
+        </div>
+      </header>
+
+      <section id="dashboardNotice" class="notice hidden"></section>
+
+      <section id="queueTab" class="tab-panel">
+        <div class="dashboard-grid">
+          <section class="queue-column">
+            <div class="toolbar panel">
+              <input id="requestSearch" type="search" placeholder="Search artist, song, requester..." />
+              <select id="statusFilter">
+                <option value="active">Active requests</option>
+                <option value="pending">Pending</option>
+                <option value="accepted">Accepted</option>
+                <option value="playing">Playing</option>
+                <option value="cant_find">Can't Find</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+            <div id="requestList" class="request-list"></div>
+          </section>
+
+          <aside class="right-rail">
+            <section class="panel now-playing-card">
+              <p class="eyebrow">NOW PLAYING</p>
+              <h2 id="nowPlayingTitle">Nothing yet</h2>
+              <p id="nowPlayingArtist" class="muted">Mark an accepted request as Playing.</p>
+            </section>
+
+            <section class="panel next-up-card">
+              <div class="section-heading">
+                <h2>Next Up</h2>
+                <span id="nextUpCount" class="count-badge">0</span>
+              </div>
+              <div id="nextUpList" class="mini-list"></div>
+            </section>
+
+            <section class="panel quick-settings-card">
+              <p class="eyebrow">EVENT LINK</p>
+              <div id="eventLinkBox" class="event-link-box">Create or select an event.</div>
+              <button id="copyEventLink" class="secondary-button" type="button">Copy Guest Link</button>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section id="playedTab" class="tab-panel hidden">
+        <section class="panel">
+          <div class="section-heading"><h2>Played</h2><span id="playedCount" class="count-badge">0</span></div>
+          <div id="playedList" class="played-list"></div>
+        </section>
+      </section>
+
+      <section id="eventsTab" class="tab-panel hidden">
+        <div class="events-layout">
+          <section class="panel">
+            <p class="eyebrow">CREATE EVENT</p>
+            <h2>Start a New Event</h2>
+            <form id="eventForm" class="event-form">
+              <label><span>Event Name</span><input id="eventName" required maxlength="120" placeholder="Home Depot Christmas Party" /></label>
+              <label><span>Event Date</span><input id="eventDate" type="date" /></label>
+              <label><span>Custom URL Name</span><input id="eventSlug" maxlength="80" placeholder="home-depot-2027" /></label>
+              <button class="primary-button" type="submit">Create Event</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading"><h2>Your Events</h2></div>
+            <div id="eventsList" class="events-list"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./js/dashboard.js"></script>
+  <script type="module" src="./js/register-sw.js"></script>
+</body>
+</html>
