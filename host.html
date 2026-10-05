@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#05070b" />
+  <title>Drop My Song — Host Access</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="dashboard-body">
+  <div id="hostLoginView" class="login-shell">
+    <section class="login-card panel">
+      <div class="login-head">
+        <img class="brand-logo login-logo" src="./assets/drop-my-song-logo.png" alt="Drop My Song by DJ Maxo" />
+        <div class="language-switch" aria-label="Language / Langue">
+          <button type="button" data-language="en">EN</button>
+          <button type="button" data-language="fr">FR</button>
+        </div>
+      </div>
+      <div>
+        <p class="eyebrow" data-i18n="host.eyebrow">HOST ACCESS</p>
+        <h1 data-i18n="host.loginTitle">Host Dashboard</h1>
+        <p class="muted" data-i18n="host.loginCopy">Sign in with the email DJ Maxo added to the event.</p>
+      </div>
+      <form id="hostLoginForm">
+        <label><span data-i18n="login.email">Email</span><input id="hostLoginEmail" type="email" required /></label>
+        <label><span data-i18n="login.password">Password</span><input id="hostLoginPassword" type="password" minlength="6" required /></label>
+        <div class="host-auth-actions">
+          <button class="primary-button" type="submit" data-i18n="host.signIn">Sign In</button>
+          <button id="hostCreateAccount" class="secondary-button" type="button" data-i18n="host.createAccount">Create Host Account</button>
+        </div>
+      </form>
+      <div id="hostLoginNotice" class="notice hidden"></div>
+    </section>
+  </div>
+
+  <div id="hostDashboardView" class="host-shell hidden">
+    <header class="host-topbar panel">
+      <div class="host-brand-line">
+        <img src="./assets/drop-my-song-logo.png" alt="Drop My Song by DJ Maxo" />
+        <div>
+          <p class="eyebrow" data-i18n="host.eyebrow">HOST ACCESS</p>
+          <h1 data-i18n="host.title">Mic Host Dashboard</h1>
+          <p id="hostIdentity" class="muted"></p>
+        </div>
+      </div>
+      <div class="host-top-actions">
+        <div class="language-switch" aria-label="Language / Langue">
+          <button type="button" data-language="en">EN</button>
+          <button type="button" data-language="fr">FR</button>
+        </div>
+        <button id="hostEnableAlerts" class="secondary-button" type="button" data-i18n="host.enableAlerts">Enable Host Alerts</button>
+        <button id="hostLogout" class="ghost-button" type="button" data-i18n="dashboard.signOut">Sign Out</button>
+      </div>
+    </header>
+
+    <section id="hostNotice" class="notice hidden"></section>
+
+    <section class="panel host-event-bar">
+      <div>
+        <p class="eyebrow" data-i18n="host.event">EVENT</p>
+        <h2 id="hostEventName" data-i18n="host.noEvent">No assigned event</h2>
+      </div>
+      <label>
+        <span data-i18n="host.chooseEvent">Choose event</span>
+        <select id="hostEventSelect"></select>
+      </label>
+    </section>
+
+    <section class="host-grid">
+      <section class="panel host-ready-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow" data-i18n="host.callNow">CALL NOW</p>
+            <h2 data-i18n="host.readyTitle">Ready to Announce</h2>
+          </div>
+          <span id="hostReadyCount" class="count-badge">0</span>
+        </div>
+        <p class="muted" data-i18n="host.readyCopy">When DJ Maxo marks a request ready/playing, call the person's name on the mic.</p>
+        <div id="hostReadyList" class="host-call-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <h2 data-i18n="host.upcomingTitle">Upcoming Queue</h2>
+          <span id="hostQueueCount" class="count-badge">0</span>
+        </div>
+        <div id="hostQueueList" class="host-call-list"></div>
+      </section>
+
+      <section class="panel host-submit-panel">
+        <p class="eyebrow" data-i18n="host.submitEyebrow">SUBMIT A REQUEST</p>
+        <h2 data-i18n="host.submitTitle">Add a Song or Karaoke Request</h2>
+        <p class="muted" data-i18n="host.submitCopy">Use the same guest form so all event rules, links and tip settings still apply.</p>
+        <div class="host-request-links">
+          <a id="hostSongRequestLink" class="primary-button" target="_blank" rel="noopener" data-i18n="host.submitSong">♫ Submit Song Request</a>
+          <a id="hostKaraokeRequestLink" class="secondary-button" target="_blank" rel="noopener" data-i18n="host.submitKaraoke">🎤 Submit Karaoke Request</a>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script type="module" src="./js/host.js"></script>
+  <script type="module" src="./js/register-sw.js"></script>
+</body>
+</html>
