@@ -64,6 +64,7 @@ let realtimeChannel = null;
 let currentTab = 'queue';
 let modalEvent = null;
 let noticeTimer = null;
+let queueReorderInProgress = false;
 
 initI18n();
 
@@ -182,7 +183,12 @@ function subscribeToRequests() {
       schema: 'public',
       table: 'song_requests',
       filter: `event_id=eq.${activeEvent.id}`,
-    }, () => loadRequests())
+    }, () => {
+      if (queueReorderInProgress) {
+        return;
+      }
+      loadRequests();
+    })
     .subscribe();
 }
 
@@ -229,8 +235,9 @@ function renderSongRequests() {
     requestList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.noMatches'))}</div>`;
     return;
   }
-  requestList.innerHTML = list.map((row, index) => requestCard(row, index, 'song')).join('');
-  bindRequestActions(requestList);
+  const canReorder = !requestSearch.value.trim() && statusFilter.value === 'active';
+  requestList.innerHTML = list.map((row, index) => requestCard(row, index, 'song', canReorder)).join('');
+  bindRequestActions(requestList, 'song', canReorder);
   hydrateLinkPreviews(requestList, { compact: true, openLabel: t('dashboard.openSongLink') });
 }
 
@@ -241,21 +248,26 @@ function renderKaraokeRequests() {
     karaokeList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.noKaraokeMatches'))}</div>`;
     return;
   }
-  karaokeList.innerHTML = list.map((row, index) => requestCard(row, index, 'karaoke')).join('');
-  bindRequestActions(karaokeList);
+  const canReorder = !karaokeSearch.value.trim() && karaokeStatusFilter.value === 'active';
+  karaokeList.innerHTML = list.map((row, index) => requestCard(row, index, 'karaoke', canReorder)).join('');
+  bindRequestActions(karaokeList, 'karaoke', canReorder);
   hydrateLinkPreviews(karaokeList, { compact: true, openLabel: t('dashboard.openSongLink') });
 }
 
-function bindRequestActions(container) {
+function bindRequestActions(container, type, canReorder = false) {
   container.querySelectorAll('[data-action]').forEach(button => {
     button.addEventListener('click', () => updateStatus(button.dataset.id, button.dataset.action));
   });
   container.querySelectorAll('[data-confirm-payment]').forEach(button => {
     button.addEventListener('click', () => confirmPayment(button.dataset.confirmPayment));
   });
+  container.querySelectorAll('[data-move-request]').forEach(button => {
+    button.addEventListener('click', () => moveRequest(button.dataset.id, type, Number(button.dataset.moveRequest)));
+  });
+  if (canReorder) enableDragReordering(container, type);
 }
 
-function requestCard(row, index, type) {
+function requestCard(row, index, type, canReorder = false) {
   const source = type === 'karaoke' ? karaokeRequests() : songRequests();
   const duplicateCount = source.filter(other =>
     other.id !== row.id &&
@@ -320,8 +332,16 @@ function requestCard(row, index, type) {
       </div>`;
   }
 
+  const reorderTools = canReorder ? `
+    <div class="queue-order-tools" title="${escapeHtml(t('dashboard.dragToReorder'))}">
+      <span class="drag-handle" aria-hidden="true">⋮⋮</span>
+      <button type="button" class="queue-move-button" data-move-request="-1" data-id="${row.id}" aria-label="${escapeHtml(t('dashboard.moveUp'))}">↑</button>
+      <button type="button" class="queue-move-button" data-move-request="1" data-id="${row.id}" aria-label="${escapeHtml(t('dashboard.moveDown'))}">↓</button>
+    </div>` : '';
+
   return `
-    <article class="request-card ${index === 0 ? 'highlight' : ''} ${type === 'karaoke' ? 'karaoke-card' : ''}">
+    <article class="request-card ${index === 0 ? 'highlight' : ''} ${type === 'karaoke' ? 'karaoke-card' : ''}" data-request-id="${row.id}" data-request-type="${type}" draggable="${canReorder ? 'true' : 'false'}">
+      ${reorderTools}
       <div class="request-card-layout ${preview ? 'has-preview' : ''}">
         ${preview}
         <div class="request-card-body">
@@ -337,6 +357,93 @@ function requestCard(row, index, type) {
         </div>
       </div>
     </article>`;
+}
+
+function activeQueueRows(type) {
+  const activeStatuses = new Set(['pending', 'accepted', 'playing', 'cant_find']);
+  const source = type === 'karaoke' ? karaokeRequests() : songRequests();
+  return source.filter(row => activeStatuses.has(row.status));
+}
+
+async function saveQueueOrder(type, orderedIds) {
+  if (!activeEvent || !orderedIds.length) return;
+  queueReorderInProgress = true;
+  try {
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      const { error } = await supabase
+        .from('song_requests')
+        .update({ sort_order: index + 1 })
+        .eq('id', orderedIds[index])
+        .eq('event_id', activeEvent.id);
+      if (error) throw error;
+    }
+    showDashboardNotice(t('dashboard.queueOrderSaved'), 'success');
+  } catch (error) {
+    showDashboardNotice(error?.message || t('dashboard.queueOrderFailed'), 'error');
+  } finally {
+    queueReorderInProgress = false;
+    await loadRequests();
+    }
+}
+
+async function moveRequest(id, type, direction) {
+  const rows = activeQueueRows(type);
+  const index = rows.findIndex(row => row.id === id);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= rows.length) return;
+  [rows[index], rows[target]] = [rows[target], rows[index]];
+  await saveQueueOrder(type, rows.map(row => row.id));
+}
+
+function enableDragReordering(container, type) {
+  let dragged = null;
+
+  container.querySelectorAll('.request-card[draggable="true"]').forEach(card => {
+    card.addEventListener('dragstart', event => {
+      if (event.target.closest('button, a, input, textarea, select')) {
+        event.preventDefault();
+        return;
+      }
+      dragged = card;
+      card.classList.add('dragging');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', card.dataset.requestId || '');
+    });
+
+    card.addEventListener('dragend', async () => {
+      card.classList.remove('dragging');
+      container.querySelectorAll('.request-card').forEach(item => item.classList.remove('drag-over'));
+      if (!dragged) return;
+      dragged = null;
+      const orderedIds = [...container.querySelectorAll('.request-card[data-request-id]')].map(item => item.dataset.requestId);
+      await saveQueueOrder(type, orderedIds);
+    });
+  });
+
+  container.addEventListener('dragover', event => {
+    if (!dragged) return;
+    event.preventDefault();
+    const target = event.target.closest('.request-card[data-request-id]');
+    if (!target || target === dragged) return;
+    container.querySelectorAll('.request-card').forEach(item => item.classList.remove('drag-over'));
+    target.classList.add('drag-over');
+    const rect = target.getBoundingClientRect();
+    const after = event.clientY > rect.top + rect.height / 2;
+    container.insertBefore(dragged, after ? target.nextSibling : target);
+  });
+}
+
+async function sendKaraokePush(row) {
+  if (!row?.id || (row.request_type || 'song') !== 'karaoke') return;
+  try {
+    const { error } = await supabase.functions.invoke('karaoke-ready-push', {
+      body: { request_id: row.id },
+    });
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Drop My Song push notification failed:', error);
+    showDashboardNotice(t('dashboard.pushDeliveryFailed'), 'error');
+  }
 }
 
 async function updateStatus(id, status) {
@@ -359,6 +466,9 @@ async function updateStatus(id, status) {
   }
 
   await broadcastGuestStatus(row, status);
+  if ((row.request_type || 'song') === 'karaoke' && status === 'playing') {
+    await sendKaraokePush(row);
+  }
   await loadRequests();
 }
 

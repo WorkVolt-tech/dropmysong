@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v6-brand';
+const CACHE = 'dropmysong-v7-queue-push';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/register-sw.js',
@@ -24,13 +24,39 @@ self.addEventListener('fetch', event => {
   event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
 
+
+self.addEventListener('push', event => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data?.text() || '' };
+  }
+
+  const title = payload.title || "You're up! 🎤";
+  const options = {
+    body: payload.body || 'Your karaoke song is ready. Please come to the DJ area now.',
+    icon: './assets/icon-192.png',
+    badge: './assets/icon-192.png',
+    tag: payload.tag || 'drop-my-song-karaoke',
+    renotify: true,
+    data: { url: payload.url || './' },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-      const existing = clients.find(client => 'focus' in client);
-      if (existing) return existing.focus();
-      return self.clients.openWindow('./');
+      const targetUrl = event.notification?.data?.url || './';
+      const existing = clients.find(client => 'focus' in client && client.url === new URL(targetUrl, self.location.origin).href)
+        || clients.find(client => 'focus' in client);
+      if (existing) {
+        if ('navigate' in existing) existing.navigate(targetUrl);
+        return existing.focus();
+      }
+      return self.clients.openWindow(targetUrl);
     })
   );
 });

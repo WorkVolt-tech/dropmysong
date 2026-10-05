@@ -605,3 +605,46 @@ a.music-preview:hover {
   .payment-confirmation-box .action-button { width: 100%; }
 }
 .tip-buttons button:disabled { opacity: .42; cursor: not-allowed; }
+
+
+/* Drop My Song queue reordering */
+.request-card { position: relative; }
+.request-card[draggable="true"] { cursor: grab; }
+.request-card[draggable="true"]:active { cursor: grabbing; }
+.request-card.dragging { opacity: .48; transform: scale(.99); }
+.request-card.drag-over { border-color: rgba(0,194,255,.72); box-shadow: 0 0 0 2px rgba(123,44,255,.18), 0 0 30px rgba(0,194,255,.10); }
+.queue-order-tools {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgba(129,159,208,.2);
+  border-radius: 12px;
+  background: rgba(3,8,15,.86);
+  backdrop-filter: blur(8px);
+}
+.drag-handle { padding: 4px 5px; color: #9fb5ce; font-weight: 900; letter-spacing: -2px; cursor: grab; user-select: none; }
+.queue-move-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(129,159,208,.22);
+  border-radius: 9px;
+  background: rgba(15,24,37,.92);
+  color: #dff7ff;
+  font-weight: 900;
+}
+.queue-move-button:hover { border-color: rgba(0,194,255,.5); background: rgba(0,194,255,.10); }
+.request-card[draggable="true"] .request-card-head { padding-right: 118px; }
+
+@media (max-width: 720px) {
+  .drag-handle { display: none; }
+  .request-card[draggable="true"] { cursor: default; }
+  .request-card[draggable="true"] .request-card-head { padding-right: 82px; }
+}

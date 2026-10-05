@@ -2,6 +2,7 @@ import { supabase } from './supabaseClient.js';
 import { escapeHtml, getOrCreateGuestToken, isHttpUrl } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 import { getLinkPreview, renderLinkPreviewInto } from './linkPreview.js';
+import { VAPID_PUBLIC_KEY } from './config.js';
 
 const params = new URLSearchParams(location.search);
 const eventSlug = params.get('event');
@@ -68,6 +69,7 @@ let previewSequence = 0;
 let lastAutoArtist = '';
 let lastAutoSong = '';
 let availableTipOptions = [2, 5, 10, 20];
+let pushRegisteredRequestId = localStorage.getItem(`dropmysong_push_request_${eventSlug}`) || null;
 
 function mayReplaceAutoFilled(input, lastAutoValue) {
   const current = input.value.trim();
@@ -475,6 +477,10 @@ form.addEventListener('submit', async event => {
     etransfer_email: publicEvent?.etransfer_email || null,
   };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
+  if (requestType === 'karaoke') {
+    pushRegisteredRequestId = null;
+    localStorage.removeItem(`dropmysong_push_request_${eventSlug}`);
+  }
   form.reset();
   lastAutoArtist = '';
   lastAutoSong = '';
@@ -491,6 +497,9 @@ form.addEventListener('submit', async event => {
   await refreshStatus();
   subscribeToRequestUpdates();
   startPolling();
+  if (requestType === 'karaoke' && 'Notification' in window && Notification.permission === 'granted') {
+    registerKaraokePush({ requestPermission: false, quiet: true });
+  }
 });
 
 async function refreshStatus() {
@@ -531,7 +540,8 @@ function renderCurrentStatus() {
     fallbackSubtitle: currentRequest.artist,
   });
   cantFindHelp.classList.toggle('hidden', currentRequest.status !== 'cant_find');
-  enableAlertsButton.classList.toggle('hidden', type !== 'karaoke' || !('Notification' in window) || Notification.permission === 'granted');
+  const pushComplete = pushRegisteredRequestId === currentRequest.id;
+  enableAlertsButton.classList.toggle('hidden', type !== 'karaoke' || pushComplete || ['played', 'rejected'].includes(currentRequest.status));
 }
 
 function restoreLastRequest() {
@@ -542,6 +552,9 @@ function restoreLastRequest() {
     refreshStatus();
     subscribeToRequestUpdates();
     startPolling();
+    if ((currentRequest.request_type || 'song') === 'karaoke' && 'Notification' in window && Notification.permission === 'granted') {
+      registerKaraokePush({ requestPermission: false, quiet: true });
+    }
   } catch {
     localStorage.removeItem(`dropmysong_last_${eventSlug}`);
   }
@@ -615,15 +628,64 @@ saveHelpLink.addEventListener('click', async () => {
   await refreshStatus();
 });
 
-enableAlertsButton.addEventListener('click', async () => {
-  if (!('Notification' in window)) return;
-  const permission = await Notification.requestPermission();
-  if (permission === 'granted') {
-    enableAlertsButton.classList.add('hidden');
-    showNotice(t('guest.alertsEnabled'), 'success');
-  } else {
-    showNotice(t('notice.notificationDenied'));
+function urlBase64ToUint8Array(value) {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
+}
+
+async function registerKaraokePush({ requestPermission = true, quiet = false } = {}) {
+  if (!currentRequest || (currentRequest.request_type || requestType) !== 'karaoke') return false;
+
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    if (!quiet) showNotice(t('notice.pushUnsupported'), 'error');
+    return false;
   }
+
+  let permission = Notification.permission;
+  if (permission === 'default' && requestPermission) permission = await Notification.requestPermission();
+  if (permission !== 'granted') {
+    if (!quiet) showNotice(t('notice.notificationDenied'), 'error');
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+
+    const json = subscription.toJSON();
+    const { error } = await supabase.from('push_subscriptions').insert({
+      request_id: currentRequest.id,
+      guest_token: guestToken,
+      endpoint: json.endpoint,
+      p256dh: json.keys?.p256dh,
+      auth: json.keys?.auth,
+      language: getLanguage(),
+      page_url: location.href,
+    });
+    if (error) throw error;
+
+    pushRegisteredRequestId = currentRequest.id;
+    localStorage.setItem(`dropmysong_push_request_${eventSlug}`, currentRequest.id);
+    enableAlertsButton.classList.add('hidden');
+    if (!quiet) showNotice(t('guest.alertsEnabled'), 'success');
+    return true;
+  } catch (error) {
+    console.warn('Drop My Song push subscription failed:', error);
+    if (!quiet) showNotice(error?.message || t('notice.pushSaveFailed'), 'error');
+    return false;
+  }
+}
+
+enableAlertsButton.addEventListener('click', async () => {
+  await registerKaraokePush({ requestPermission: true, quiet: false });
 });
 
 readyAcknowledge.addEventListener('click', () => karaokeReadyAlert.classList.add('hidden'));
