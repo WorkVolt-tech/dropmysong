@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { escapeHtml, getOrCreateGuestToken, isHttpUrl } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
-import { renderLinkPreviewInto } from './linkPreview.js';
+import { getLinkPreview, renderLinkPreviewInto } from './linkPreview.js';
 
 const params = new URLSearchParams(location.search);
 const eventSlug = params.get('event');
@@ -50,24 +50,51 @@ let readyAnnouncementVersion = null;
 let audioContext = null;
 let linkPreviewTimer = null;
 let previewSequence = 0;
+let lastAutoArtist = '';
+let lastAutoSong = '';
+
+function mayReplaceAutoFilled(input, lastAutoValue) {
+  const current = input.value.trim();
+  return !current || (lastAutoValue && current === lastAutoValue);
+}
+
+function applyPreviewMetadata(preview) {
+  if (!preview) return;
+
+  const detectedArtist = (preview.artistName || preview.subtitle || '').trim();
+  const detectedSong = (preview.trackTitle || preview.title || '').trim();
+
+  if (detectedArtist && mayReplaceAutoFilled(artistInput, lastAutoArtist)) {
+    artistInput.value = detectedArtist.slice(0, 120);
+    lastAutoArtist = artistInput.value.trim();
+  }
+
+  if (detectedSong && mayReplaceAutoFilled(songInput, lastAutoSong)) {
+    songInput.value = detectedSong.slice(0, 160);
+    lastAutoSong = songInput.value.trim();
+  }
+}
 
 function scheduleSongLinkPreview() {
   clearTimeout(linkPreviewTimer);
   const value = songUrlInput.value.trim();
+
   if (!value) {
     songLinkPreview.innerHTML = '';
     songLinkPreview.classList.add('hidden');
     return;
   }
+
   const sequence = ++previewSequence;
   linkPreviewTimer = setTimeout(async () => {
-    songLinkPreview.dataset.previewUrl = value;
-    await renderLinkPreviewInto(songLinkPreview, value, {
+    const preview = await renderLinkPreviewInto(songLinkPreview, value, {
       linked: true,
       fallbackTitle: songInput.value.trim(),
       fallbackSubtitle: artistInput.value.trim(),
     });
+
     if (sequence !== previewSequence) return;
+    applyPreviewMetadata(preview);
   }, 320);
 }
 
@@ -80,9 +107,11 @@ message.addEventListener('input', () => {
 
 songUrlInput.addEventListener('input', scheduleSongLinkPreview);
 artistInput.addEventListener('input', () => {
+  if (artistInput.value.trim() !== lastAutoArtist) lastAutoArtist = '';
   if (songUrlInput.value.trim()) scheduleSongLinkPreview();
 });
 songInput.addEventListener('input', () => {
+  if (songInput.value.trim() !== lastAutoSong) lastAutoSong = '';
   if (songUrlInput.value.trim()) scheduleSongLinkPreview();
 });
 
@@ -197,35 +226,69 @@ form.addEventListener('submit', async event => {
   clearNotice();
   primeAudio();
 
-  const artist = artistInput.value.trim();
-  const song = songInput.value.trim();
+  let artist = artistInput.value.trim();
+  let song = songInput.value.trim();
   const songUrl = songUrlInput.value.trim();
   const name = requesterName.value.trim();
   const note = message.value.trim();
 
-  if (!artist || !song) {
+  const hasManualPair = Boolean(artist && song);
+  const hasLink = Boolean(songUrl);
+
+  if (!hasManualPair && !hasLink) {
     showNotice(t('notice.artistSongRequired'), 'error');
+    return;
+  }
+  if (hasLink && !isHttpUrl(songUrl)) {
+    showNotice(t('notice.invalidLink'), 'error');
     return;
   }
   if (requestType === 'karaoke' && !name) {
     showNotice(t('notice.singerRequired'), 'error');
     return;
   }
-  if (!isHttpUrl(songUrl)) {
-    showNotice(t('notice.invalidLink'), 'error');
-    return;
-  }
 
   submitButton.disabled = true;
   submitButton.textContent = t('guest.sending');
+
+  // A song link can stand on its own. Resolve whatever metadata the platform
+  // exposes, then fill any missing Artist/Song values before saving.
+  if (hasLink && (!artist || !song)) {
+    try {
+      const preview = await getLinkPreview(songUrl, {
+        title: song,
+        subtitle: artist,
+      });
+
+      artist ||= (preview?.artistName || preview?.subtitle || preview?.providerName || 'Linked song').trim();
+      song ||= (preview?.trackTitle || preview?.title || 'Song from link').trim();
+
+      if (!artist) artist = 'Linked song';
+      if (!song) song = 'Song from link';
+
+      artistInput.value = artist.slice(0, 120);
+      songInput.value = song.slice(0, 160);
+      lastAutoArtist = artistInput.value.trim();
+      lastAutoSong = songInput.value.trim();
+    } catch (error) {
+      console.debug('DropMySong metadata fallback:', error?.message || error);
+      artist ||= 'Linked song';
+      song ||= 'Song from link';
+    }
+  }
+
+  // Existing database rules require non-empty Artist/Song columns. By this
+  // point they are either user-entered or populated from the submitted link.
+  artist = artist.slice(0, 120);
+  song = song.slice(0, 160);
 
   const requestId = crypto.randomUUID();
   const { error } = await supabase.from('song_requests').insert({
     id: requestId,
     event_id: publicEvent.id,
     request_type: requestType,
-    artist: artist.slice(0, 120),
-    song: song.slice(0, 160),
+    artist,
+    song,
     song_url: songUrl || null,
     requester_name: name ? name.slice(0, 80) : null,
     message: note ? note.slice(0, 200) : null,
@@ -245,6 +308,8 @@ form.addEventListener('submit', async event => {
   currentRequest = { id: requestId, artist, song, song_url: songUrl || null, request_type: requestType };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
   form.reset();
+  lastAutoArtist = '';
+  lastAutoSong = '';
   songLinkPreview.innerHTML = '';
   songLinkPreview.classList.add('hidden');
   messageCount.textContent = '0';

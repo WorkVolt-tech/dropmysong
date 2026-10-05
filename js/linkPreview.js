@@ -73,11 +73,68 @@ function appleTrackId(url) {
   return numbers?.at(-1) || null;
 }
 
+function cleanCreator(value = '') {
+  return String(value)
+    .replace(/\s*-\s*Topic$/i, '')
+    .replace(/\s*VEVO$/i, '')
+    .trim();
+}
+
+function titleFromPath(url) {
+  const parts = url.pathname.split('/').filter(Boolean);
+  const last = decodeURIComponent(parts.at(-1) || '')
+    .replace(/\.[a-z0-9]{2,5}$/i, '')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return last && !/^[a-z0-9]{10,}$/i.test(last) ? last : '';
+}
+
+function inferArtistAndTrack(title = '', creator = '') {
+  let trackTitle = String(title || '').trim();
+  let artistName = cleanCreator(creator);
+
+  // A large number of YouTube/SoundCloud uploads use "Artist - Song".
+  const separators = [' - ', ' – ', ' — ', ' | '];
+  for (const separator of separators) {
+    if (!trackTitle.includes(separator)) continue;
+    const [left, ...rest] = trackTitle.split(separator);
+    const right = rest.join(separator).trim();
+    if (left.trim() && right) {
+      artistName = left.trim();
+      trackTitle = right
+        .replace(/\s*\((official\s+)?(music\s+)?video\).*$/i, '')
+        .replace(/\s*\[(official\s+)?(music\s+)?video\].*$/i, '')
+        .trim();
+      break;
+    }
+  }
+
+  return { artistName, trackTitle };
+}
+
 async function resolveRemotePreview(url, provider) {
+  if (provider.key === 'youtube') {
+    const data = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url.href)}`);
+    const inferred = inferArtistAndTrack(data.title || '', data.author_name || '');
+    return {
+      title: data.title || inferred.trackTitle || '',
+      subtitle: inferred.artistName || data.author_name || '',
+      trackTitle: inferred.trackTitle || data.title || '',
+      artistName: inferred.artistName || cleanCreator(data.author_name || ''),
+      imageUrl: data.thumbnail_url || '',
+      providerName: data.provider_name || provider.name,
+    };
+  }
+
   if (provider.key === 'spotify') {
     const data = await fetchJson(`https://open.spotify.com/oembed?url=${encodeURIComponent(url.href)}`);
+    const inferred = inferArtistAndTrack(data.title || '', data.author_name || '');
     return {
       title: data.title || '',
+      subtitle: inferred.artistName || '',
+      trackTitle: inferred.trackTitle || data.title || '',
+      artistName: inferred.artistName || '',
       imageUrl: data.thumbnail_url || '',
       providerName: data.provider_name || provider.name,
     };
@@ -85,8 +142,12 @@ async function resolveRemotePreview(url, provider) {
 
   if (provider.key === 'soundcloud') {
     const data = await fetchJson(`https://soundcloud.com/oembed?format=json&url=${encodeURIComponent(url.href)}`);
+    const inferred = inferArtistAndTrack(data.title || '', data.author_name || '');
     return {
       title: data.title || '',
+      subtitle: inferred.artistName || data.author_name || '',
+      trackTitle: inferred.trackTitle || data.title || '',
+      artistName: inferred.artistName || cleanCreator(data.author_name || ''),
       imageUrl: data.thumbnail_url || '',
       providerName: data.provider_name || provider.name,
     };
@@ -94,8 +155,12 @@ async function resolveRemotePreview(url, provider) {
 
   if (provider.key === 'deezer') {
     const data = await fetchJson(`https://api.deezer.com/oembed?url=${encodeURIComponent(url.href)}&format=json`);
+    const inferred = inferArtistAndTrack(data.title || '', data.author_name || '');
     return {
       title: data.title || '',
+      subtitle: inferred.artistName || data.author_name || '',
+      trackTitle: inferred.trackTitle || data.title || '',
+      artistName: inferred.artistName || cleanCreator(data.author_name || ''),
       imageUrl: data.thumbnail_url || '',
       providerName: data.provider_name || provider.name,
     };
@@ -111,6 +176,8 @@ async function resolveRemotePreview(url, provider) {
     return {
       title: result.trackName || result.collectionName || '',
       subtitle: result.artistName || '',
+      trackTitle: result.trackName || result.collectionName || '',
+      artistName: result.artistName || '',
       imageUrl: artwork,
       providerName: 'Apple Music',
     };
@@ -126,7 +193,11 @@ export async function getLinkPreview(value, fallback = {}) {
   const cacheKey = url.href;
   if (previewCache.has(cacheKey)) {
     const cached = await previewCache.get(cacheKey);
-    return { ...cached, fallbackTitle: fallback.title || cached.fallbackTitle, fallbackSubtitle: fallback.subtitle || cached.fallbackSubtitle };
+    return {
+      ...cached,
+      fallbackTitle: fallback.title || cached.fallbackTitle,
+      fallbackSubtitle: fallback.subtitle || cached.fallbackSubtitle,
+    };
   }
 
   const task = (async () => {
@@ -140,32 +211,49 @@ export async function getLinkPreview(value, fallback = {}) {
       providerIcon: provider.icon,
       title: '',
       subtitle: '',
+      trackTitle: '',
+      artistName: '',
       imageUrl: ytId ? `https://i.ytimg.com/vi/${encodeURIComponent(ytId)}/hqdefault.jpg` : '',
       fallbackTitle: fallback.title || '',
       fallbackSubtitle: fallback.subtitle || '',
     };
 
-    if (!ytId) {
-      try {
-        const remote = await resolveRemotePreview(url, provider);
-        if (remote) preview = { ...preview, ...remote };
-      } catch (error) {
-        console.debug('DropMySong link preview fallback:', error?.message || error);
-      }
+    try {
+      const remote = await resolveRemotePreview(url, provider);
+      if (remote) preview = { ...preview, ...remote };
+    } catch (error) {
+      console.debug('DropMySong link preview fallback:', error?.message || error);
     }
 
+    if (!preview.trackTitle) {
+      const inferred = inferArtistAndTrack(preview.title, preview.subtitle);
+      preview.trackTitle = inferred.trackTitle || titleFromPath(url) || 'Linked song';
+      if (!preview.artistName) preview.artistName = inferred.artistName;
+    }
+
+    if (!preview.artistName) {
+      preview.artistName = preview.fallbackSubtitle || provider.name;
+    }
+
+    if (!preview.title) preview.title = preview.trackTitle;
+    if (!preview.subtitle) preview.subtitle = preview.artistName;
     if (!preview.imageUrl) preview.imageUrl = fallbackArtwork(provider);
+
     return preview;
   })();
 
   previewCache.set(cacheKey, task);
   const result = await task;
-  return { ...result, fallbackTitle: fallback.title || result.fallbackTitle, fallbackSubtitle: fallback.subtitle || result.fallbackSubtitle };
+  return {
+    ...result,
+    fallbackTitle: fallback.title || result.fallbackTitle,
+    fallbackSubtitle: fallback.subtitle || result.fallbackSubtitle,
+  };
 }
 
 function previewHtml(preview, { compact = false, openLabel = '', linked = true } = {}) {
-  const title = preview.title || preview.fallbackTitle || preview.providerName;
-  const subtitle = preview.subtitle || preview.fallbackSubtitle || '';
+  const title = preview.trackTitle || preview.title || preview.fallbackTitle || preview.providerName;
+  const subtitle = preview.artistName || preview.subtitle || preview.fallbackSubtitle || preview.providerName;
   const content = `
     <div class="music-preview-art-wrap">
       <img class="music-preview-art" src="${escapeHtml(preview.imageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" />
@@ -184,13 +272,13 @@ function previewHtml(preview, { compact = false, openLabel = '', linked = true }
 }
 
 export async function renderLinkPreviewInto(container, value, options = {}) {
-  if (!container) return;
+  if (!container) return null;
   const url = safeUrl(value);
   if (!url) {
     container.innerHTML = '';
     container.classList.add('hidden');
     delete container.dataset.previewUrl;
-    return;
+    return null;
   }
 
   const expectedUrl = url.href;
@@ -198,8 +286,9 @@ export async function renderLinkPreviewInto(container, value, options = {}) {
   container.classList.remove('hidden');
   container.innerHTML = `<div class="music-preview preview-loading ${options.compact ? 'compact' : ''}"><div class="music-preview-art music-preview-skeleton"></div><div class="music-preview-info"><span class="preview-line"></span><span class="preview-line short"></span></div></div>`;
   const preview = await getLinkPreview(expectedUrl, { title: options.fallbackTitle, subtitle: options.fallbackSubtitle });
-  if (!preview || container.dataset.previewUrl !== expectedUrl) return;
+  if (!preview || container.dataset.previewUrl !== expectedUrl) return null;
   container.innerHTML = previewHtml(preview, options);
+  return preview;
 }
 
 export async function hydrateLinkPreviews(root = document, options = {}) {

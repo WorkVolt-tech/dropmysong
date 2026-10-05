@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v3-link-preview';
+const CACHE = 'dropmysong-v4-artist-or-link';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/register-sw.js',

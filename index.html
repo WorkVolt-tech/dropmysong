@@ -38,24 +38,26 @@
     <section class="hero-copy">
       <p id="heroEyebrow" class="eyebrow">DROP IT IN THE MIX</p>
       <h1 id="heroTitle">Request a Song</h1>
-      <p id="heroSubtitle">Tell DJ Maxo what you want to hear. Artist and song are required.</p>
+      <p id="heroSubtitle">Enter Artist + Song, or paste the song link.</p>
     </section>
 
     <section id="guestNotice" class="notice hidden" aria-live="polite"></section>
 
     <form id="requestForm" class="panel request-form" novalidate>
+      <p class="muted" data-i18n="guest.artistOrLinkHint">Enter both Artist + Song, or just paste a song link below.</p>
+
       <label>
-        <span><span data-i18n="guest.artist">Artist</span> <strong>*</strong></span>
-        <input id="artist" name="artist" autocomplete="off" maxlength="120" required data-i18n-placeholder="guest.artistPlaceholder" placeholder="e.g. Drake" />
+        <span><span data-i18n="guest.artist">Artist</span></span>
+        <input id="artist" name="artist" autocomplete="off" maxlength="120" data-i18n-placeholder="guest.artistPlaceholder" placeholder="e.g. Drake" />
       </label>
 
       <label>
-        <span><span data-i18n="guest.song">Song</span> <strong>*</strong></span>
-        <input id="song" name="song" autocomplete="off" maxlength="160" required data-i18n-placeholder="guest.songPlaceholder" placeholder="e.g. God's Plan" />
+        <span><span data-i18n="guest.song">Song</span></span>
+        <input id="song" name="song" autocomplete="off" maxlength="160" data-i18n-placeholder="guest.songPlaceholder" placeholder="e.g. God's Plan" />
       </label>
 
       <label>
-        <span><span data-i18n="guest.songLink">Song Link</span> <small data-i18n="guest.optional">(optional)</small></span>
+        <span><span data-i18n="guest.songLink">Song Link</span> <small data-i18n="guest.linkAlternative">(instead of Artist + Song)</small></span>
         <input id="songUrl" name="songUrl" type="url" inputmode="url" data-i18n-placeholder="guest.songLinkPlaceholder" placeholder="YouTube, Spotify, Apple Music, SoundCloud..." />
       </label>
 
