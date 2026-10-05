@@ -11,16 +11,22 @@
 <body class="dashboard-body">
   <div id="loginView" class="login-shell">
     <section class="login-card panel">
-      <img class="brand-logo login-logo" src="./assets/dj-maxo-logo.png" alt="DJ Maxo" />
+      <div class="login-head">
+        <img class="brand-logo login-logo" src="./assets/dj-maxo-logo.png" alt="DJ Maxo" />
+        <div class="language-switch" aria-label="Language / Langue">
+          <button type="button" data-language="en">EN</button>
+          <button type="button" data-language="fr">FR</button>
+        </div>
+      </div>
       <div>
-        <p class="eyebrow">DROPMYSONG</p>
-        <h1>DJ Dashboard</h1>
-        <p class="muted">Sign in with the DJ account you create in Supabase Auth.</p>
+        <p class="eyebrow" data-i18n="login.eyebrow">DROPMYSONG</p>
+        <h1 data-i18n="login.title">DJ Dashboard</h1>
+        <p class="muted" data-i18n="login.copy">Sign in with your DJ account.</p>
       </div>
       <form id="loginForm">
-        <label><span>Email</span><input id="loginEmail" type="email" required /></label>
-        <label><span>Password</span><input id="loginPassword" type="password" required /></label>
-        <button class="primary-button" type="submit">Sign In</button>
+        <label><span data-i18n="login.email">Email</span><input id="loginEmail" type="email" required /></label>
+        <label><span data-i18n="login.password">Password</span><input id="loginPassword" type="password" required /></label>
+        <button class="primary-button" type="submit" data-i18n="login.signIn">Sign In</button>
       </form>
       <div id="loginNotice" class="notice hidden"></div>
     </section>
@@ -33,28 +39,40 @@
         <span>DropMySong</span>
       </div>
       <nav>
-        <button class="nav-item active" data-tab="queue">Queue</button>
-        <button class="nav-item" data-tab="played">Played</button>
-        <button class="nav-item" data-tab="events">Events</button>
+        <button class="nav-item active" data-tab="queue" data-i18n="dashboard.queue">Song Requests</button>
+        <button class="nav-item" data-tab="karaoke" data-i18n="dashboard.karaoke">Karaoke</button>
+        <button class="nav-item" data-tab="played" data-i18n="dashboard.played">History</button>
+        <button class="nav-item" data-tab="events" data-i18n="dashboard.events">Events</button>
       </nav>
-      <button id="logoutButton" class="ghost-button sidebar-logout">Sign Out</button>
+      <div class="sidebar-bottom">
+        <div class="language-switch" aria-label="Language / Langue">
+          <button type="button" data-language="en">EN</button>
+          <button type="button" data-language="fr">FR</button>
+        </div>
+        <button id="logoutButton" class="ghost-button sidebar-logout" data-i18n="dashboard.signOut">Sign Out</button>
+      </div>
     </aside>
 
     <main class="dashboard-main">
       <header class="dashboard-topbar">
         <div>
-          <p class="eyebrow">LIVE CONTROL</p>
-          <h1>Song Requests <span id="requestCount" class="count-badge">0</span></h1>
+          <p class="eyebrow" data-i18n="dashboard.liveControl">LIVE CONTROL</p>
+          <h1><span id="dashboardTitle">Song Requests</span> <span id="requestCount" class="count-badge">0</span></h1>
           <p id="activeEventName" class="muted">No active event</p>
         </div>
         <div class="topbar-controls">
           <label class="toggle-card">
-            <span>Requests</span>
+            <span data-i18n="dashboard.requests">Requests</span>
             <input id="requestsToggle" type="checkbox" />
             <i></i>
           </label>
           <label class="toggle-card">
-            <span>Tips</span>
+            <span data-i18n="dashboard.karaoke">Karaoke</span>
+            <input id="karaokeToggle" type="checkbox" />
+            <i></i>
+          </label>
+          <label class="toggle-card">
+            <span data-i18n="dashboard.tips">Tips</span>
             <input id="tipsToggle" type="checkbox" />
             <i></i>
           </label>
@@ -67,15 +85,15 @@
         <div class="dashboard-grid">
           <section class="queue-column">
             <div class="toolbar panel">
-              <input id="requestSearch" type="search" placeholder="Search artist, song, requester..." />
+              <input id="requestSearch" type="search" data-i18n-placeholder="dashboard.searchSongs" placeholder="Search artist, song, requester..." />
               <select id="statusFilter">
-                <option value="active">Active requests</option>
-                <option value="pending">Pending</option>
-                <option value="accepted">Accepted</option>
-                <option value="playing">Playing</option>
-                <option value="cant_find">Can't Find</option>
-                <option value="rejected">Rejected</option>
-                <option value="all">All</option>
+                <option value="active" data-i18n="dashboard.filter.active">Active requests</option>
+                <option value="pending" data-i18n="dashboard.filter.pending">Pending</option>
+                <option value="accepted" data-i18n="dashboard.filter.accepted">Accepted</option>
+                <option value="playing" data-i18n="dashboard.filter.playing">Playing / Called</option>
+                <option value="cant_find" data-i18n="dashboard.filter.cantFind">Can't Find</option>
+                <option value="rejected" data-i18n="dashboard.filter.rejected">Rejected</option>
+                <option value="all" data-i18n="dashboard.filter.all">All</option>
               </select>
             </div>
             <div id="requestList" class="request-list"></div>
@@ -83,50 +101,101 @@
 
           <aside class="right-rail">
             <section class="panel now-playing-card">
-              <p class="eyebrow">NOW PLAYING</p>
+              <p class="eyebrow" data-i18n="dashboard.nowPlaying">NOW PLAYING</p>
               <h2 id="nowPlayingTitle">Nothing yet</h2>
               <p id="nowPlayingArtist" class="muted">Mark an accepted request as Playing.</p>
             </section>
 
             <section class="panel next-up-card">
               <div class="section-heading">
-                <h2>Next Up</h2>
+                <h2 data-i18n="dashboard.nextUp">Next Up</h2>
                 <span id="nextUpCount" class="count-badge">0</span>
               </div>
               <div id="nextUpList" class="mini-list"></div>
             </section>
 
-            <section class="panel quick-settings-card">
-              <p class="eyebrow">EVENT LINK</p>
+            <section class="panel qr-card">
+              <p class="eyebrow" data-i18n="dashboard.songQr">SONG REQUEST QR</p>
+              <div id="songQr" class="qr-code-box"></div>
+              <p class="qr-caption" data-i18n="dashboard.scanSong">Scan to request a song</p>
               <div id="eventLinkBox" class="event-link-box">Create or select an event.</div>
-              <button id="copyEventLink" class="secondary-button" type="button">Copy Guest Link</button>
+              <button id="copyEventLink" class="secondary-button" type="button" data-i18n="dashboard.copyGuestLink">Copy Guest Link</button>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section id="karaokeTab" class="tab-panel hidden">
+        <div class="dashboard-grid">
+          <section class="queue-column">
+            <div class="toolbar panel">
+              <input id="karaokeSearch" type="search" data-i18n-placeholder="dashboard.searchKaraoke" placeholder="Search artist, song, singer..." />
+              <select id="karaokeStatusFilter">
+                <option value="active" data-i18n="dashboard.filter.active">Active requests</option>
+                <option value="pending" data-i18n="dashboard.filter.pending">Pending</option>
+                <option value="accepted" data-i18n="dashboard.filter.accepted">Accepted</option>
+                <option value="playing" data-i18n="dashboard.filter.playing">Playing / Called</option>
+                <option value="cant_find" data-i18n="dashboard.filter.cantFind">Can't Find</option>
+                <option value="rejected" data-i18n="dashboard.filter.rejected">Rejected</option>
+                <option value="all" data-i18n="dashboard.filter.all">All</option>
+              </select>
+            </div>
+            <div id="karaokeList" class="request-list"></div>
+          </section>
+
+          <aside class="right-rail">
+            <section class="panel karaoke-ready-card-dj">
+              <p class="eyebrow" data-i18n="dashboard.karaokeReady">READY TO SING</p>
+              <div id="karaokeReadyList" class="mini-list"></div>
+            </section>
+
+            <section class="panel next-up-card">
+              <div class="section-heading">
+                <h2 data-i18n="dashboard.karaokeQueue">Karaoke Queue</h2>
+                <span id="karaokeNextCount" class="count-badge">0</span>
+              </div>
+              <div id="karaokeNextList" class="mini-list"></div>
+            </section>
+
+            <section class="panel qr-card">
+              <p class="eyebrow" data-i18n="dashboard.karaokeQr">KARAOKE QR</p>
+              <div id="karaokeQr" class="qr-code-box"></div>
+              <p class="qr-caption" data-i18n="dashboard.scanKaraoke">Scan to request karaoke</p>
+              <div id="karaokeLinkBox" class="event-link-box">Create or select an event.</div>
+              <button id="copyKaraokeLink" class="secondary-button" type="button" data-i18n="dashboard.copyLink">Copy Link</button>
             </section>
           </aside>
         </div>
       </section>
 
       <section id="playedTab" class="tab-panel hidden">
-        <section class="panel">
-          <div class="section-heading"><h2>Played</h2><span id="playedCount" class="count-badge">0</span></div>
-          <div id="playedList" class="played-list"></div>
-        </section>
+        <div class="history-grid">
+          <section class="panel">
+            <div class="section-heading"><h2 data-i18n="dashboard.playedSongs">Played Songs</h2><span id="playedCount" class="count-badge">0</span></div>
+            <div id="playedList" class="played-list"></div>
+          </section>
+          <section class="panel">
+            <div class="section-heading"><h2 data-i18n="dashboard.karaokeHistory">Karaoke History</h2><span id="karaokePlayedCount" class="count-badge">0</span></div>
+            <div id="karaokePlayedList" class="played-list"></div>
+          </section>
+        </div>
       </section>
 
       <section id="eventsTab" class="tab-panel hidden">
         <div class="events-layout">
           <section class="panel">
-            <p class="eyebrow">CREATE EVENT</p>
-            <h2>Start a New Event</h2>
+            <p class="eyebrow" data-i18n="dashboard.createEvent">CREATE EVENT</p>
+            <h2 data-i18n="dashboard.startEvent">Start a New Event</h2>
             <form id="eventForm" class="event-form">
-              <label><span>Event Name</span><input id="eventName" required maxlength="120" placeholder="Home Depot Christmas Party" /></label>
-              <label><span>Event Date</span><input id="eventDate" type="date" /></label>
-              <label><span>Custom URL Name</span><input id="eventSlug" maxlength="80" placeholder="home-depot-2027" /></label>
-              <button class="primary-button" type="submit">Create Event</button>
+              <label><span data-i18n="dashboard.eventName">Event Name</span><input id="eventName" required maxlength="120" placeholder="Home Depot Christmas Party" /></label>
+              <label><span data-i18n="dashboard.eventDate">Event Date</span><input id="eventDate" type="date" /></label>
+              <label><span data-i18n="dashboard.customUrl">Custom URL Name</span><input id="eventSlug" maxlength="80" placeholder="home-depot-2027" /></label>
+              <button class="primary-button" type="submit" data-i18n="dashboard.createEventButton">Create Event</button>
             </form>
           </section>
 
           <section class="panel">
-            <div class="section-heading"><h2>Your Events</h2></div>
+            <div class="section-heading"><h2 data-i18n="dashboard.yourEvents">Your Events</h2></div>
             <div id="eventsList" class="events-list"></div>
           </section>
         </div>
@@ -134,6 +203,28 @@
     </main>
   </div>
 
+  <section id="qrModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
+    <div class="panel qr-modal-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">DROPMYSONG</p>
+          <h2 id="qrModalTitle" data-i18n="dashboard.qrTitle">Event QR Code</h2>
+        </div>
+        <button id="closeQrModal" class="icon-button" type="button" aria-label="Close">×</button>
+      </div>
+      <p id="qrModalEventName" class="muted"></p>
+      <div class="qr-mode-switch">
+        <button type="button" class="active" data-qr-type="song" data-i18n="dashboard.qrSongMode">Song Requests</button>
+        <button type="button" data-qr-type="karaoke" data-i18n="dashboard.qrKaraokeMode">Karaoke</button>
+      </div>
+      <div id="qrModalCode" class="qr-code-box large"></div>
+      <div id="qrModalLink" class="event-link-box"></div>
+      <p id="qrInactiveWarning" class="notice hidden" data-i18n="dashboard.inactiveQrWarning">This event is inactive. Make it active before sharing this QR code.</p>
+      <button id="copyQrModalLink" class="primary-button" type="button" data-i18n="dashboard.copyLink">Copy Link</button>
+    </div>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="./js/dashboard.js"></script>
   <script type="module" src="./js/register-sw.js"></script>
 </body>

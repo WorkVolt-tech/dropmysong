@@ -1,12 +1,3 @@
-export const STATUS_LABELS = {
-  pending: 'Pending',
-  accepted: 'Accepted',
-  playing: 'Playing',
-  played: 'Played',
-  rejected: 'Rejected',
-  cant_find: "Can't Find",
-};
-
 export function escapeHtml(value = '') {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -40,14 +31,14 @@ export function isHttpUrl(value = '') {
   }
 }
 
-export function relativeTime(iso) {
+export function relativeTime(iso, language = 'en') {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return language === 'fr' ? "à l'instant" : 'just now';
+  if (mins < 60) return language === 'fr' ? `il y a ${mins} min` : `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(iso).toLocaleDateString();
+  if (hours < 24) return language === 'fr' ? `il y a ${hours} h` : `${hours}h ago`;
+  return new Date(iso).toLocaleDateString(language === 'fr' ? 'fr-CA' : 'en-CA');
 }
 
 export function getOrCreateGuestToken() {
@@ -62,4 +53,11 @@ export function getOrCreateGuestToken() {
 
 export function appBaseUrl() {
   return `${location.origin}${location.pathname.replace(/[^/]*$/, '')}`;
+}
+
+export function buildGuestUrl(slug, type = 'song') {
+  const url = new URL('index.html', appBaseUrl());
+  url.searchParams.set('event', slug);
+  if (type === 'karaoke') url.searchParams.set('type', 'karaoke');
+  return url.toString();
 }

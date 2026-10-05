@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient.js';
-import { STATUS_LABELS, appBaseUrl, escapeHtml, relativeTime, slugify } from './common.js';
+import { appBaseUrl, buildGuestUrl, escapeHtml, relativeTime, slugify } from './common.js';
+import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 
 const loginView = document.querySelector('#loginView');
 const dashboardView = document.querySelector('#dashboardView');
@@ -7,38 +8,69 @@ const loginForm = document.querySelector('#loginForm');
 const loginNotice = document.querySelector('#loginNotice');
 const dashboardNotice = document.querySelector('#dashboardNotice');
 const logoutButton = document.querySelector('#logoutButton');
+const dashboardTitle = document.querySelector('#dashboardTitle');
 const requestList = document.querySelector('#requestList');
 const requestSearch = document.querySelector('#requestSearch');
 const statusFilter = document.querySelector('#statusFilter');
+const karaokeList = document.querySelector('#karaokeList');
+const karaokeSearch = document.querySelector('#karaokeSearch');
+const karaokeStatusFilter = document.querySelector('#karaokeStatusFilter');
 const requestCount = document.querySelector('#requestCount');
 const activeEventName = document.querySelector('#activeEventName');
 const requestsToggle = document.querySelector('#requestsToggle');
+const karaokeToggle = document.querySelector('#karaokeToggle');
 const tipsToggle = document.querySelector('#tipsToggle');
 const nowPlayingTitle = document.querySelector('#nowPlayingTitle');
 const nowPlayingArtist = document.querySelector('#nowPlayingArtist');
 const nextUpList = document.querySelector('#nextUpList');
 const nextUpCount = document.querySelector('#nextUpCount');
+const karaokeReadyList = document.querySelector('#karaokeReadyList');
+const karaokeNextList = document.querySelector('#karaokeNextList');
+const karaokeNextCount = document.querySelector('#karaokeNextCount');
 const eventLinkBox = document.querySelector('#eventLinkBox');
+const karaokeLinkBox = document.querySelector('#karaokeLinkBox');
 const copyEventLink = document.querySelector('#copyEventLink');
+const copyKaraokeLink = document.querySelector('#copyKaraokeLink');
+const songQr = document.querySelector('#songQr');
+const karaokeQr = document.querySelector('#karaokeQr');
 const playedList = document.querySelector('#playedList');
 const playedCount = document.querySelector('#playedCount');
+const karaokePlayedList = document.querySelector('#karaokePlayedList');
+const karaokePlayedCount = document.querySelector('#karaokePlayedCount');
 const eventForm = document.querySelector('#eventForm');
 const eventsList = document.querySelector('#eventsList');
+const qrModal = document.querySelector('#qrModal');
+const closeQrModal = document.querySelector('#closeQrModal');
+const qrModalEventName = document.querySelector('#qrModalEventName');
+const qrModalCode = document.querySelector('#qrModalCode');
+const qrModalLink = document.querySelector('#qrModalLink');
+const qrInactiveWarning = document.querySelector('#qrInactiveWarning');
+const copyQrModalLink = document.querySelector('#copyQrModalLink');
+const qrModeButtons = [...document.querySelectorAll('[data-qr-type]')];
 
 let session = null;
 let events = [];
 let activeEvent = null;
 let requests = [];
 let realtimeChannel = null;
+let currentTab = 'queue';
+let modalEvent = null;
+let modalQrType = 'song';
+let noticeTimer = null;
+
+initI18n();
 
 function showLoginNotice(text, type = 'error') {
   loginNotice.textContent = text;
   loginNotice.className = `notice ${type}`;
 }
+
 function showDashboardNotice(text, type = '') {
+  if (noticeTimer) clearTimeout(noticeTimer);
   dashboardNotice.textContent = text;
-  dashboardNotice.className = `notice ${type}`;
-  setTimeout(() => dashboardNotice.classList.add('hidden'), 3500);
+  dashboardNotice.className = `notice ${type}`.trim();
+  dashboardNotice.classList.remove('hidden');
+  noticeTimer = setTimeout(() => dashboardNotice.classList.add('hidden'), 3500);
 }
 
 loginForm.addEventListener('submit', async event => {
@@ -61,41 +93,58 @@ async function enterDashboard() {
   loginView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
   await loadEvents();
+  setTab(currentTab);
 }
 
-async function loadEvents() {
+async function loadEvents(preferredEventId = null) {
   const { data, error } = await supabase.from('events').select('*').order('created_at', { ascending: false });
   if (error) {
     showDashboardNotice(error.message, 'error');
     return;
   }
   events = data || [];
-  activeEvent = events.find(item => item.is_active) || events[0] || null;
+  const target = preferredEventId
+    ? events.find(item => item.id === preferredEventId)
+    : events.find(item => item.id === activeEvent?.id) || events.find(item => item.is_active) || events[0] || null;
   renderEvents();
-  await activateEvent(activeEvent?.id || null);
+  await activateEvent(target?.id || null);
 }
 
 async function activateEvent(eventId) {
   activeEvent = events.find(item => item.id === eventId) || null;
+  renderEvents();
+
   if (!activeEvent) {
     requests = [];
-    activeEventName.textContent = 'No active event';
-    requestList.innerHTML = '<div class="empty-state">Create an event to start receiving requests.</div>';
-    renderSideRail();
-    eventLinkBox.textContent = 'Create or select an event.';
+    activeEventName.textContent = t('dashboard.noActiveEvent');
+    requestList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.createToStart'))}</div>`;
+    karaokeList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.createToStart'))}</div>`;
+    eventLinkBox.textContent = t('dashboard.createOrSelect');
+    karaokeLinkBox.textContent = t('dashboard.createOrSelect');
     requestsToggle.checked = false;
+    karaokeToggle.checked = false;
     tipsToggle.checked = false;
     teardownRealtime();
+    clearQr(songQr);
+    clearQr(karaokeQr);
+    renderAll();
     return;
   }
 
-  activeEventName.textContent = activeEvent.name;
+  activeEventName.textContent = `${activeEvent.name}${activeEvent.is_active ? '' : ` · ${t('dashboard.inactive')}`}`;
   requestsToggle.checked = !!activeEvent.requests_enabled;
+  karaokeToggle.checked = activeEvent.karaoke_enabled !== false;
   tipsToggle.checked = !!activeEvent.tips_enabled;
-  const url = `${appBaseUrl()}index.html?event=${encodeURIComponent(activeEvent.slug)}`;
-  eventLinkBox.textContent = url;
+  renderEventLinksAndQr();
   await loadRequests();
   subscribeToRequests();
+}
+
+async function openEvent(eventId) {
+  await activateEvent(eventId);
+  setTab('queue');
+  showDashboardNotice(t('dashboard.eventOpened'), 'success');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function loadRequests() {
@@ -110,7 +159,7 @@ async function loadRequests() {
     showDashboardNotice(error.message, 'error');
     return;
   }
-  requests = data || [];
+  requests = (data || []).map(row => ({ ...row, request_type: row.request_type || 'song' }));
   renderAll();
 }
 
@@ -118,8 +167,13 @@ function subscribeToRequests() {
   teardownRealtime();
   if (!activeEvent) return;
   realtimeChannel = supabase
-    .channel(`requests-${activeEvent.id}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'song_requests', filter: `event_id=eq.${activeEvent.id}` }, () => loadRequests())
+    .channel(`dropmysong-dashboard-${activeEvent.id}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'song_requests',
+      filter: `event_id=eq.${activeEvent.id}`,
+    }, () => loadRequests())
     .subscribe();
 }
 
@@ -128,71 +182,118 @@ function teardownRealtime() {
   realtimeChannel = null;
 }
 
-function renderAll() {
-  renderRequests();
-  renderSideRail();
-  renderPlayed();
+function songRequests() {
+  return requests.filter(row => row.request_type !== 'karaoke');
 }
 
-function filteredRequests() {
-  const q = requestSearch.value.trim().toLowerCase();
-  const filter = statusFilter.value;
+function karaokeRequests() {
+  return requests.filter(row => row.request_type === 'karaoke');
+}
+
+function activeCount(rows) {
+  return rows.filter(row => ['pending', 'accepted', 'playing', 'cant_find'].includes(row.status)).length;
+}
+
+function renderAll() {
+  renderSongRequests();
+  renderKaraokeRequests();
+  renderSongSideRail();
+  renderKaraokeSideRail();
+  renderHistory();
+  updateDashboardHeader();
+}
+
+function filterRows(rows, query, filter) {
+  const q = query.trim().toLowerCase();
   const activeStatuses = new Set(['pending', 'accepted', 'playing', 'cant_find']);
-  return requests.filter(row => {
+  return rows.filter(row => {
     const statusOk = filter === 'all' || (filter === 'active' ? activeStatuses.has(row.status) : row.status === filter);
     const haystack = `${row.artist} ${row.song} ${row.requester_name || ''}`.toLowerCase();
     return statusOk && (!q || haystack.includes(q));
   });
 }
 
-function renderRequests() {
-  const list = filteredRequests();
-  requestCount.textContent = requests.filter(r => ['pending', 'accepted', 'playing', 'cant_find'].includes(r.status)).length;
+function renderSongRequests() {
+  const rows = songRequests();
+  const list = filterRows(rows, requestSearch.value, statusFilter.value);
   if (!list.length) {
-    requestList.innerHTML = '<div class="empty-state">No requests match this view.</div>';
+    requestList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.noMatches'))}</div>`;
     return;
   }
-  requestList.innerHTML = list.map((row, index) => requestCard(row, index)).join('');
-  requestList.querySelectorAll('[data-action]').forEach(button => {
+  requestList.innerHTML = list.map((row, index) => requestCard(row, index, 'song')).join('');
+  bindRequestActions(requestList);
+}
+
+function renderKaraokeRequests() {
+  const rows = karaokeRequests();
+  const list = filterRows(rows, karaokeSearch.value, karaokeStatusFilter.value);
+  if (!list.length) {
+    karaokeList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.noKaraokeMatches'))}</div>`;
+    return;
+  }
+  karaokeList.innerHTML = list.map((row, index) => requestCard(row, index, 'karaoke')).join('');
+  bindRequestActions(karaokeList);
+}
+
+function bindRequestActions(container) {
+  container.querySelectorAll('[data-action]').forEach(button => {
     button.addEventListener('click', () => updateStatus(button.dataset.id, button.dataset.action));
   });
 }
 
-function requestCard(row, index) {
-  const duplicateCount = requests.filter(other => other.id !== row.id && other.status !== 'rejected' && `${other.artist}`.trim().toLowerCase() === `${row.artist}`.trim().toLowerCase() && `${other.song}`.trim().toLowerCase() === `${row.song}`.trim().toLowerCase()).length;
-  const link = row.song_url ? `<a class="request-link" href="${escapeHtml(row.song_url)}" target="_blank" rel="noopener">Open song link ↗</a>` : '';
-  const tip = row.tip_amount ? ` · Tip selected: $${Number(row.tip_amount).toFixed(0)}` : '';
-  const duplicate = duplicateCount ? ` · 🔥 ${duplicateCount + 1} requests` : '';
+function requestCard(row, index, type) {
+  const source = type === 'karaoke' ? karaokeRequests() : songRequests();
+  const duplicateCount = source.filter(other =>
+    other.id !== row.id &&
+    other.status !== 'rejected' &&
+    `${other.artist}`.trim().toLowerCase() === `${row.artist}`.trim().toLowerCase() &&
+    `${other.song}`.trim().toLowerCase() === `${row.song}`.trim().toLowerCase()
+  ).length;
+
+  const link = row.song_url
+    ? `<a class="request-link" href="${escapeHtml(row.song_url)}" target="_blank" rel="noopener">${escapeHtml(t('dashboard.openSongLink'))}</a>`
+    : '';
+  const tip = row.tip_amount ? ` · ${escapeHtml(t('dashboard.tipSelected'))}: $${Number(row.tip_amount).toFixed(0)}` : '';
+  const duplicate = duplicateCount ? ` · 🔥 ${duplicateCount + 1} ${escapeHtml(t('dashboard.requestsPlural'))}` : '';
+  const personPrefix = type === 'karaoke' ? '🎤 ' : '';
+  const person = row.requester_name ? ` · ${personPrefix}${escapeHtml(row.requester_name)}` : '';
+  const statusLabel = type === 'karaoke'
+    ? t(`status.karaoke.${row.status}Label`)
+    : t(`status.${row.status}`);
 
   let actions = '';
   if (row.status === 'pending' || row.status === 'cant_find') {
     actions = `
       <div class="request-actions">
-        <button class="action-button primary" data-action="accepted" data-id="${row.id}">Accept</button>
-        <button class="action-button danger" data-action="rejected" data-id="${row.id}">Reject</button>
-        <button class="action-button" data-action="cant_find" data-id="${row.id}">Can't Find</button>
+        <button class="action-button primary" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.accept'))}</button>
+        <button class="action-button danger" data-action="rejected" data-id="${row.id}">${escapeHtml(t('dashboard.reject'))}</button>
+        <button class="action-button" data-action="cant_find" data-id="${row.id}">${escapeHtml(t('dashboard.cantFind'))}</button>
       </div>`;
   } else if (row.status === 'accepted') {
-    actions = `
-      <div class="request-actions two">
-        <button class="action-button primary" data-action="playing" data-id="${row.id}">▶ Playing</button>
-        <button class="action-button success" data-action="played" data-id="${row.id}">✓ Played</button>
-      </div>`;
+    actions = type === 'karaoke'
+      ? `<div class="request-actions two">
+          <button class="action-button primary karaoke-call" data-action="playing" data-id="${row.id}">${escapeHtml(t('dashboard.callSinger'))}</button>
+          <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.completed'))}</button>
+        </div>`
+      : `<div class="request-actions two">
+          <button class="action-button primary" data-action="playing" data-id="${row.id}">${escapeHtml(t('dashboard.playing'))}</button>
+          <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.markPlayed'))}</button>
+        </div>`;
   } else if (row.status === 'playing') {
     actions = `
       <div class="request-actions two">
-        <button class="action-button success" data-action="played" data-id="${row.id}">✓ Played</button>
-        <button class="action-button" data-action="accepted" data-id="${row.id}">Back to Queue</button>
+        <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(type === 'karaoke' ? t('dashboard.completed') : t('dashboard.markPlayed'))}</button>
+        <button class="action-button" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.backQueue'))}</button>
       </div>`;
   }
 
   return `
-    <article class="request-card ${index === 0 ? 'highlight' : ''}">
+    <article class="request-card ${index === 0 ? 'highlight' : ''} ${type === 'karaoke' ? 'karaoke-card' : ''}">
       <div class="request-card-head">
         <div>
-          <span class="status-pill ${row.status}">${escapeHtml(STATUS_LABELS[row.status] || row.status)}</span>
+          <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
           <h3>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</h3>
-          <div class="request-meta">${escapeHtml(relativeTime(row.created_at))}${row.requester_name ? ` · ${escapeHtml(row.requester_name)}` : ''}${tip}${duplicate}</div>
+          <div class="request-meta">${escapeHtml(relativeTime(row.created_at, getLanguage()))}${person}${tip}${duplicate}</div>
         </div>
         ${link}
       </div>
@@ -202,59 +303,138 @@ function requestCard(row, index) {
 }
 
 async function updateStatus(id, status) {
+  const row = requests.find(item => item.id === id);
+  if (!row) return;
+
   const payload = { status, updated_at: new Date().toISOString() };
   if (status === 'played') payload.played_at = new Date().toISOString();
+  if (status !== 'played' && row.status === 'played') payload.played_at = null;
+
   const { error } = await supabase.from('song_requests').update(payload).eq('id', id);
-  if (error) showDashboardNotice(error.message, 'error');
-  else await loadRequests();
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+
+  await broadcastGuestStatus(row, status);
+  await loadRequests();
 }
 
-function renderSideRail() {
-  const playing = requests.find(row => row.status === 'playing');
-  nowPlayingTitle.textContent = playing?.song || 'Nothing yet';
-  nowPlayingArtist.textContent = playing?.artist || 'Mark an accepted request as Playing.';
+async function broadcastGuestStatus(row, status) {
+  if (!row?.guest_token) return;
+  const channel = supabase.channel(`dropmysong-request-${row.id}-${row.guest_token}`);
+  try {
+    await channel.send({
+      type: 'broadcast',
+      event: 'status-update',
+      payload: {
+        request_id: row.id,
+        request_type: row.request_type || 'song',
+        status,
+        updated_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.warn('DropMySong guest broadcast failed; polling will still update the guest.', error);
+  } finally {
+    supabase.removeChannel(channel);
+  }
+}
 
-  const next = requests.filter(row => row.status === 'accepted').slice(0, 8);
+function renderSongSideRail() {
+  const rows = songRequests();
+  const playing = rows.find(row => row.status === 'playing');
+  nowPlayingTitle.textContent = playing?.song || t('dashboard.nothingYet');
+  nowPlayingArtist.textContent = playing?.artist || t('dashboard.markPlaying');
+
+  const next = rows.filter(row => row.status === 'accepted').slice(0, 8);
   nextUpCount.textContent = next.length;
-  nextUpList.innerHTML = next.length ? next.map((row, index) => `
-    <div class="mini-item"><strong>${index + 1}. ${escapeHtml(row.song)}</strong><span class="muted">${escapeHtml(row.artist)}</span></div>
-  `).join('') : '<div class="empty-state">No accepted requests yet.</div>';
+  nextUpList.innerHTML = next.length
+    ? next.map((row, index) => `<div class="mini-item"><strong>${index + 1}. ${escapeHtml(row.song)}</strong><span class="muted">${escapeHtml(row.artist)}</span></div>`).join('')
+    : `<div class="empty-state">${escapeHtml(t('dashboard.noAccepted'))}</div>`;
 }
 
-function renderPlayed() {
-  const played = requests.filter(row => row.status === 'played').sort((a, b) => new Date(b.played_at || b.updated_at) - new Date(a.played_at || a.updated_at));
-  playedCount.textContent = played.length;
-  playedList.innerHTML = played.length ? played.map(row => `
-    <div class="played-item"><strong>✓ ${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</strong><span class="muted">${escapeHtml(row.requester_name || 'Guest')}</span></div>
-  `).join('') : '<div class="empty-state">Nothing has been marked played yet.</div>';
+function renderKaraokeSideRail() {
+  const rows = karaokeRequests();
+  const ready = rows.filter(row => row.status === 'playing');
+  karaokeReadyList.innerHTML = ready.length
+    ? ready.map(row => `<div class="mini-item karaoke-ready-mini"><strong>🎤 ${escapeHtml(row.requester_name || t('request.singer'))}</strong><span>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div>`).join('')
+    : `<div class="empty-state">${escapeHtml(t('dashboard.noSingerCalled'))}</div>`;
+
+  const next = rows.filter(row => row.status === 'accepted').slice(0, 8);
+  karaokeNextCount.textContent = next.length;
+  karaokeNextList.innerHTML = next.length
+    ? next.map((row, index) => `<div class="mini-item"><strong>${index + 1}. ${escapeHtml(row.requester_name || t('request.singer'))}</strong><span class="muted">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div>`).join('')
+    : `<div class="empty-state">${escapeHtml(t('dashboard.noKaraokeAccepted'))}</div>`;
 }
 
-requestSearch.addEventListener('input', renderRequests);
-statusFilter.addEventListener('change', renderRequests);
+function renderHistory() {
+  const songs = songRequests()
+    .filter(row => row.status === 'played')
+    .sort((a, b) => new Date(b.played_at || b.updated_at) - new Date(a.played_at || a.updated_at));
+  const karaoke = karaokeRequests()
+    .filter(row => row.status === 'played')
+    .sort((a, b) => new Date(b.played_at || b.updated_at) - new Date(a.played_at || a.updated_at));
 
-requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked));
-tipsToggle.addEventListener('change', () => updateEventSetting('tips_enabled', tipsToggle.checked));
+  playedCount.textContent = songs.length;
+  karaokePlayedCount.textContent = karaoke.length;
 
-async function updateEventSetting(field, value) {
+  playedList.innerHTML = songs.length
+    ? songs.map(row => `<div class="played-item"><strong>✓ ${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</strong><span class="muted">${escapeHtml(row.requester_name || t('request.guest'))}</span></div>`).join('')
+    : `<div class="empty-state">${escapeHtml(t('dashboard.noPlayed'))}</div>`;
+
+  karaokePlayedList.innerHTML = karaoke.length
+    ? karaoke.map(row => `<div class="played-item"><strong>🎤 ${escapeHtml(row.requester_name || t('request.singer'))}</strong><span class="muted">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div>`).join('')
+    : `<div class="empty-state">${escapeHtml(t('dashboard.noKaraokeHistory'))}</div>`;
+}
+
+requestSearch.addEventListener('input', renderSongRequests);
+statusFilter.addEventListener('change', renderSongRequests);
+karaokeSearch.addEventListener('input', renderKaraokeRequests);
+karaokeStatusFilter.addEventListener('change', renderKaraokeRequests);
+
+requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked, t('dashboard.requests')));
+karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
+tipsToggle.addEventListener('change', () => updateEventSetting('tips_enabled', tipsToggle.checked, t('dashboard.tips')));
+
+async function updateEventSetting(field, value, label) {
   if (!activeEvent) return;
   const { error } = await supabase.from('events').update({ [field]: value }).eq('id', activeEvent.id);
   if (error) {
     showDashboardNotice(error.message, 'error');
     if (field === 'requests_enabled') requestsToggle.checked = !value;
+    if (field === 'karaoke_enabled') karaokeToggle.checked = !value;
     if (field === 'tips_enabled') tipsToggle.checked = !value;
     return;
   }
   activeEvent[field] = value;
   events = events.map(item => item.id === activeEvent.id ? { ...item, [field]: value } : item);
-  showDashboardNotice(`${field === 'requests_enabled' ? 'Requests' : 'Tips'} ${value ? 'enabled' : 'disabled'}.`, 'success');
+  showDashboardNotice(t(value ? 'dashboard.settingEnabled' : 'dashboard.settingDisabled', { name: label }), 'success');
 }
 
 copyEventLink.addEventListener('click', async () => {
   if (!activeEvent) return;
-  const text = eventLinkBox.textContent;
-  await navigator.clipboard.writeText(text);
-  showDashboardNotice('Guest request link copied.', 'success');
+  await copyText(eventLinkBox.textContent);
+  showDashboardNotice(t('dashboard.songQrCopied'), 'success');
 });
+
+copyKaraokeLink.addEventListener('click', async () => {
+  if (!activeEvent) return;
+  await copyText(karaokeLinkBox.textContent);
+  showDashboardNotice(t('dashboard.karaokeQrCopied'), 'success');
+});
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  area.remove();
+}
 
 eventForm.addEventListener('submit', async event => {
   event.preventDefault();
@@ -268,39 +448,48 @@ eventForm.addEventListener('submit', async event => {
   const ownerId = authData.user?.id;
   if (!ownerId) return showDashboardNotice('You must be signed in.', 'error');
 
-  const { error } = await supabase.from('events').insert({
+  const { data, error } = await supabase.from('events').insert({
     owner_id: ownerId,
     name,
     slug,
     event_date: eventDate,
     requests_enabled: true,
+    karaoke_enabled: true,
     tips_enabled: false,
     is_active: events.length === 0,
-  });
+  }).select('id').single();
+
   if (error) return showDashboardNotice(error.message, 'error');
   eventForm.reset();
-  showDashboardNotice('Event created.', 'success');
-  await loadEvents();
+  showDashboardNotice(t('dashboard.eventCreated'), 'success');
+  await loadEvents(data?.id || null);
+  setTab('events');
 });
 
 function renderEvents() {
   if (!events.length) {
-    eventsList.innerHTML = '<div class="empty-state">No events yet.</div>';
+    eventsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.createToStart'))}</div>`;
     return;
   }
+  const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
   eventsList.innerHTML = events.map(event => `
-    <div class="event-item">
+    <div class="event-item ${activeEvent?.id === event.id ? 'selected' : ''}">
       <div>
-        <strong>${escapeHtml(event.name)} ${event.is_active ? '🟢' : ''}</strong>
-        <small>${event.event_date ? escapeHtml(new Date(event.event_date + 'T00:00:00').toLocaleDateString()) : 'No date'} · /?event=${escapeHtml(event.slug)}</small>
+        <div class="event-title-line">
+          <strong>${escapeHtml(event.name)}</strong>
+          <span class="event-state ${event.is_active ? 'active' : ''}">${escapeHtml(t(event.is_active ? 'dashboard.active' : 'dashboard.inactive'))}</span>
+        </div>
+        <small>${event.event_date ? escapeHtml(new Date(event.event_date + 'T00:00:00').toLocaleDateString(locale)) : escapeHtml(t('dashboard.noDate'))} · /?event=${escapeHtml(event.slug)}</small>
       </div>
       <div class="event-actions">
-        <button class="secondary-button" data-select-event="${event.id}">Open</button>
-        ${event.is_active ? '' : `<button class="ghost-button" data-activate-event="${event.id}">Make Active</button>`}
+        <button class="secondary-button" data-select-event="${event.id}">${escapeHtml(t('dashboard.open'))}</button>
+        <button class="secondary-button" data-show-qr="${event.id}">${escapeHtml(t('dashboard.qr'))}</button>
+        ${event.is_active ? '' : `<button class="ghost-button" data-activate-event="${event.id}">${escapeHtml(t('dashboard.makeActive'))}</button>`}
       </div>
     </div>`).join('');
 
-  eventsList.querySelectorAll('[data-select-event]').forEach(button => button.addEventListener('click', () => activateEvent(button.dataset.selectEvent)));
+  eventsList.querySelectorAll('[data-select-event]').forEach(button => button.addEventListener('click', () => openEvent(button.dataset.selectEvent)));
+  eventsList.querySelectorAll('[data-show-qr]').forEach(button => button.addEventListener('click', () => openQrModal(button.dataset.showQr)));
   eventsList.querySelectorAll('[data-activate-event]').forEach(button => button.addEventListener('click', () => makeEventActive(button.dataset.activateEvent)));
 }
 
@@ -309,16 +498,116 @@ async function makeEventActive(id) {
   if (clearError) return showDashboardNotice(clearError.message, 'error');
   const { error } = await supabase.from('events').update({ is_active: true }).eq('id', id);
   if (error) return showDashboardNotice(error.message, 'error');
-  await loadEvents();
+  await loadEvents(id);
+}
+
+function setTab(tab) {
+  currentTab = ['queue', 'karaoke', 'played', 'events'].includes(tab) ? tab : 'queue';
+  document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === currentTab));
+  document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
+  document.querySelector(`#${currentTab}Tab`)?.classList.remove('hidden');
+  updateDashboardHeader();
 }
 
 document.querySelectorAll('.nav-item').forEach(button => {
+  button.addEventListener('click', () => setTab(button.dataset.tab));
+});
+
+function updateDashboardHeader() {
+  const titles = {
+    queue: t('dashboard.songRequests'),
+    karaoke: t('dashboard.karaokeRequests'),
+    played: t('dashboard.playedTitle'),
+    events: t('dashboard.eventsTitle'),
+  };
+  dashboardTitle.textContent = titles[currentTab];
+  const count = currentTab === 'queue'
+    ? activeCount(songRequests())
+    : currentTab === 'karaoke'
+      ? activeCount(karaokeRequests())
+      : currentTab === 'played'
+        ? songRequests().filter(row => row.status === 'played').length + karaokeRequests().filter(row => row.status === 'played').length
+        : events.length;
+  requestCount.textContent = count;
+}
+
+function renderEventLinksAndQr() {
+  if (!activeEvent) return;
+  const songUrl = buildGuestUrl(activeEvent.slug, 'song');
+  const karaokeUrl = buildGuestUrl(activeEvent.slug, 'karaoke');
+  eventLinkBox.textContent = songUrl;
+  karaokeLinkBox.textContent = karaokeUrl;
+  renderQrCode(songQr, songUrl);
+  renderQrCode(karaokeQr, karaokeUrl);
+}
+
+function clearQr(container) {
+  if (container) container.innerHTML = '';
+}
+
+function renderQrCode(container, url) {
+  if (!container) return;
+  container.innerHTML = '';
+  if (!url) return;
+  if (window.QRCode) {
+    new window.QRCode(container, {
+      text: url,
+      width: container.classList.contains('large') ? 260 : 180,
+      height: container.classList.contains('large') ? 260 : 180,
+      colorDark: '#05070b',
+      colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.M,
+    });
+  } else {
+    container.innerHTML = `<div class="empty-state">${escapeHtml(url)}</div>`;
+  }
+}
+
+function openQrModal(eventId) {
+  modalEvent = events.find(item => item.id === eventId) || null;
+  if (!modalEvent) return;
+  modalQrType = 'song';
+  qrModal.classList.remove('hidden');
+  renderQrModal();
+}
+
+function renderQrModal() {
+  if (!modalEvent) return;
+  qrModalEventName.textContent = modalEvent.name;
+  qrModeButtons.forEach(button => button.classList.toggle('active', button.dataset.qrType === modalQrType));
+  const url = buildGuestUrl(modalEvent.slug, modalQrType);
+  qrModalLink.textContent = url;
+  qrInactiveWarning.classList.toggle('hidden', !!modalEvent.is_active);
+  renderQrCode(qrModalCode, url);
+}
+
+qrModeButtons.forEach(button => {
   button.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item === button));
-    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
-    document.querySelector(`#${button.dataset.tab}Tab`).classList.remove('hidden');
+    modalQrType = button.dataset.qrType === 'karaoke' ? 'karaoke' : 'song';
+    renderQrModal();
   });
 });
+
+closeQrModal.addEventListener('click', () => qrModal.classList.add('hidden'));
+qrModal.addEventListener('click', event => {
+  if (event.target === qrModal) qrModal.classList.add('hidden');
+});
+copyQrModalLink.addEventListener('click', async () => {
+  await copyText(qrModalLink.textContent);
+  showDashboardNotice(t(modalQrType === 'karaoke' ? 'dashboard.karaokeQrCopied' : 'dashboard.songQrCopied'), 'success');
+});
+
+window.addEventListener('dropmysong:languagechange', () => {
+  applyTranslations();
+  renderEvents();
+  renderAll();
+  renderEventLinksAndQr();
+  if (modalEvent && !qrModal.classList.contains('hidden')) renderQrModal();
+  if (activeEvent) activeEventName.textContent = `${activeEvent.name}${activeEvent.is_active ? '' : ` · ${t('dashboard.inactive')}`}`;
+  else activeEventName.textContent = t('dashboard.noActiveEvent');
+});
+
+window.addEventListener('beforeunload', teardownRealtime);
 
 const { data: sessionData } = await supabase.auth.getSession();
 session = sessionData.session;
