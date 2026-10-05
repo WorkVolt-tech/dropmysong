@@ -128,6 +128,22 @@ async function loadEvent() {
   }
 
   publicEvent = data[0];
+
+  // v2 keeps the existing public event RPC and reads only the public karaoke toggle
+  // from a tiny view. This avoids replacing database functions during the upgrade.
+  const { data: optionRows, error: optionsError } = await supabase
+    .from('dropmysong_event_options')
+    .select('karaoke_enabled')
+    .eq('id', publicEvent.id)
+    .limit(1);
+
+  if (!optionsError && optionRows?.length) {
+    publicEvent.karaoke_enabled = optionRows[0].karaoke_enabled;
+  } else {
+    // Safe fallback for an event created before the v2 toggle existed.
+    publicEvent.karaoke_enabled = true;
+  }
+
   renderEventBanner();
   syncAvailability();
   restoreLastRequest();
@@ -167,28 +183,30 @@ form.addEventListener('submit', async event => {
   submitButton.disabled = true;
   submitButton.textContent = t('guest.sending');
 
-  const { data, error } = await supabase.rpc('submit_request_v2', {
-    p_event_slug: eventSlug,
-    p_request_type: requestType,
-    p_artist: artist,
-    p_song: song,
-    p_song_url: songUrl || null,
-    p_requester_name: name || null,
-    p_message: note || null,
-    p_tip_amount: tipAmount.value ? Number(tipAmount.value) : null,
-    p_guest_token: guestToken,
+  const requestId = crypto.randomUUID();
+  const { error } = await supabase.from('song_requests').insert({
+    id: requestId,
+    event_id: publicEvent.id,
+    request_type: requestType,
+    artist: artist.slice(0, 120),
+    song: song.slice(0, 160),
+    song_url: songUrl || null,
+    requester_name: name ? name.slice(0, 80) : null,
+    message: note ? note.slice(0, 200) : null,
+    tip_amount: publicEvent.tips_enabled && tipAmount.value ? Number(tipAmount.value) : null,
+    guest_token: guestToken,
   });
 
   submitButton.disabled = false;
   submitButton.textContent = t(requestType === 'karaoke' ? 'guest.submit.karaoke' : 'guest.submit.song');
 
-  if (error || !data?.length) {
+  if (error) {
     console.error(error);
     showNotice(error?.message || t('notice.couldNotSubmit'), 'error');
     return;
   }
 
-  currentRequest = { id: data[0].request_id, artist, song, request_type: requestType };
+  currentRequest = { id: requestId, artist, song, request_type: requestType };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
   form.reset();
   messageCount.textContent = '0';
@@ -202,7 +220,7 @@ form.addEventListener('submit', async event => {
 
 async function refreshStatus() {
   if (!currentRequest) return;
-  const { data, error } = await supabase.rpc('get_request_status_v2', {
+  const { data, error } = await supabase.rpc('get_request_status', {
     p_request_id: currentRequest.id,
     p_guest_token: guestToken,
   });
@@ -213,7 +231,7 @@ async function refreshStatus() {
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
   renderCurrentStatus();
 
-  if (row.request_type === 'karaoke' && row.status === 'playing' && readyAnnouncementVersion !== row.updated_at) {
+  if ((currentRequest.request_type || requestType) === 'karaoke' && row.status === 'playing' && readyAnnouncementVersion !== row.updated_at) {
     readyAnnouncementVersion = row.updated_at;
     announceKaraokeReady(row);
   }
