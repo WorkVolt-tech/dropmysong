@@ -115,9 +115,9 @@
             </section>
 
             <section class="panel qr-card">
-              <p class="eyebrow" data-i18n="dashboard.songQr">SONG REQUEST QR</p>
+              <p class="eyebrow" data-i18n="dashboard.songQr">EVENT QR</p>
               <div id="songQr" class="qr-code-box"></div>
-              <p class="qr-caption" data-i18n="dashboard.scanSong">Scan to request a song</p>
+              <p class="qr-caption" data-i18n="dashboard.scanSong">Scan once — choose Song Request or Karaoke</p>
               <div id="eventLinkBox" class="event-link-box">Create or select an event.</div>
               <button id="copyEventLink" class="secondary-button" type="button" data-i18n="dashboard.copyGuestLink">Copy Guest Link</button>
             </section>
@@ -158,9 +158,9 @@
             </section>
 
             <section class="panel qr-card">
-              <p class="eyebrow" data-i18n="dashboard.karaokeQr">KARAOKE QR</p>
+              <p class="eyebrow" data-i18n="dashboard.karaokeQr">EVENT QR</p>
               <div id="karaokeQr" class="qr-code-box"></div>
-              <p class="qr-caption" data-i18n="dashboard.scanKaraoke">Scan to request karaoke</p>
+              <p class="qr-caption" data-i18n="dashboard.scanKaraoke">Scan once — choose Song Request or Karaoke</p>
               <div id="karaokeLinkBox" class="event-link-box">Create or select an event.</div>
               <button id="copyKaraokeLink" class="secondary-button" type="button" data-i18n="dashboard.copyLink">Copy Link</button>
             </section>
@@ -213,10 +213,7 @@
         <button id="closeQrModal" class="icon-button" type="button" aria-label="Close">×</button>
       </div>
       <p id="qrModalEventName" class="muted"></p>
-      <div class="qr-mode-switch">
-        <button type="button" class="active" data-qr-type="song" data-i18n="dashboard.qrSongMode">Song Requests</button>
-        <button type="button" data-qr-type="karaoke" data-i18n="dashboard.qrKaraokeMode">Karaoke</button>
-      </div>
+      <p class="qr-caption" data-i18n="dashboard.scanSong">Scan once — choose Song Request or Karaoke</p>
       <div id="qrModalCode" class="qr-code-box large"></div>
       <div id="qrModalLink" class="event-link-box"></div>
       <p id="qrInactiveWarning" class="notice hidden" data-i18n="dashboard.inactiveQrWarning">This event is inactive. Make it active before sharing this QR code.</p>

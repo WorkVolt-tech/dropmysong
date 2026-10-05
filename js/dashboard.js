@@ -46,7 +46,6 @@ const qrModalCode = document.querySelector('#qrModalCode');
 const qrModalLink = document.querySelector('#qrModalLink');
 const qrInactiveWarning = document.querySelector('#qrInactiveWarning');
 const copyQrModalLink = document.querySelector('#copyQrModalLink');
-const qrModeButtons = [...document.querySelectorAll('[data-qr-type]')];
 
 let session = null;
 let events = [];
@@ -55,7 +54,6 @@ let requests = [];
 let realtimeChannel = null;
 let currentTab = 'queue';
 let modalEvent = null;
-let modalQrType = 'song';
 let noticeTimer = null;
 
 initI18n();
@@ -415,13 +413,13 @@ async function updateEventSetting(field, value, label) {
 copyEventLink.addEventListener('click', async () => {
   if (!activeEvent) return;
   await copyText(eventLinkBox.textContent);
-  showDashboardNotice(t('dashboard.songQrCopied'), 'success');
+  showDashboardNotice(t('dashboard.linkCopied'), 'success');
 });
 
 copyKaraokeLink.addEventListener('click', async () => {
   if (!activeEvent) return;
   await copyText(karaokeLinkBox.textContent);
-  showDashboardNotice(t('dashboard.karaokeQrCopied'), 'success');
+  showDashboardNotice(t('dashboard.linkCopied'), 'success');
 });
 
 async function copyText(text) {
@@ -533,12 +531,11 @@ function updateDashboardHeader() {
 
 function renderEventLinksAndQr() {
   if (!activeEvent) return;
-  const songUrl = buildGuestUrl(activeEvent.slug, 'song');
-  const karaokeUrl = buildGuestUrl(activeEvent.slug, 'karaoke');
-  eventLinkBox.textContent = songUrl;
-  karaokeLinkBox.textContent = karaokeUrl;
-  renderQrCode(songQr, songUrl);
-  renderQrCode(karaokeQr, karaokeUrl);
+  const guestUrl = buildGuestUrl(activeEvent.slug);
+  eventLinkBox.textContent = guestUrl;
+  karaokeLinkBox.textContent = guestUrl;
+  renderQrCode(songQr, guestUrl);
+  renderQrCode(karaokeQr, guestUrl);
 }
 
 function clearQr(container) {
@@ -566,7 +563,6 @@ function renderQrCode(container, url) {
 function openQrModal(eventId) {
   modalEvent = events.find(item => item.id === eventId) || null;
   if (!modalEvent) return;
-  modalQrType = 'song';
   qrModal.classList.remove('hidden');
   renderQrModal();
 }
@@ -574,19 +570,11 @@ function openQrModal(eventId) {
 function renderQrModal() {
   if (!modalEvent) return;
   qrModalEventName.textContent = modalEvent.name;
-  qrModeButtons.forEach(button => button.classList.toggle('active', button.dataset.qrType === modalQrType));
-  const url = buildGuestUrl(modalEvent.slug, modalQrType);
+  const url = buildGuestUrl(modalEvent.slug);
   qrModalLink.textContent = url;
   qrInactiveWarning.classList.toggle('hidden', !!modalEvent.is_active);
   renderQrCode(qrModalCode, url);
 }
-
-qrModeButtons.forEach(button => {
-  button.addEventListener('click', () => {
-    modalQrType = button.dataset.qrType === 'karaoke' ? 'karaoke' : 'song';
-    renderQrModal();
-  });
-});
 
 closeQrModal.addEventListener('click', () => qrModal.classList.add('hidden'));
 qrModal.addEventListener('click', event => {
@@ -594,7 +582,7 @@ qrModal.addEventListener('click', event => {
 });
 copyQrModalLink.addEventListener('click', async () => {
   await copyText(qrModalLink.textContent);
-  showDashboardNotice(t(modalQrType === 'karaoke' ? 'dashboard.karaokeQrCopied' : 'dashboard.songQrCopied'), 'success');
+  showDashboardNotice(t('dashboard.linkCopied'), 'success');
 });
 
 window.addEventListener('dropmysong:languagechange', () => {
