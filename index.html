@@ -74,18 +74,44 @@
         <small class="counter"><span id="messageCount">0</span>/200</small>
       </label>
 
-      <section id="tipsPanel" class="tip-panel hidden">
-        <div>
-          <strong data-i18n="guest.sendTip">Send a tip</strong>
-          <p data-i18n="guest.tipCopy">Optional — show the DJ some love.</p>
+      <section id="tipsPanel" class="tip-panel">
+        <div class="tip-panel-heading">
+          <div>
+            <strong data-i18n="guest.sendTip">Send a tip</strong>
+            <p id="tipRequirementCopy" data-i18n="guest.tipCopy">Optional — show the DJ some love.</p>
+          </div>
+          <span id="tipRequiredBadge" class="tip-required-badge hidden" data-i18n="guest.tipRequiredBadge">REQUIRED</span>
         </div>
-        <div class="tip-buttons" role="group" aria-label="Tip amount">
-          <button type="button" data-tip="2">$2</button>
-          <button type="button" data-tip="5">$5</button>
-          <button type="button" data-tip="10">$10</button>
-          <button type="button" data-tip="20">$20</button>
-        </div>
+        <div id="tipButtons" class="tip-buttons" role="group" aria-label="Tip amount"></div>
         <input id="tipAmount" type="hidden" value="" />
+
+        <div id="paymentMethods" class="payment-methods hidden">
+          <p class="payment-title" data-i18n="guest.choosePayment">Choose payment method</p>
+          <div class="payment-method-grid">
+            <button id="paypalMethod" type="button" class="payment-method hidden" data-payment-method="paypal">
+              <strong>PayPal</strong>
+              <small data-i18n="guest.paypalMethodCopy">Pay securely with PayPal</small>
+            </button>
+            <button id="etransferMethod" type="button" class="payment-method hidden" data-payment-method="etransfer">
+              <strong data-i18n="guest.etransfer">Interac e-Transfer</strong>
+              <small data-i18n="guest.etransferMethodCopy">Send the selected amount by e-transfer</small>
+            </button>
+          </div>
+          <input id="paymentMethod" type="hidden" value="" />
+
+          <div id="paypalFields" class="payment-details hidden">
+            <p data-i18n="guest.paypalAfterSubmit">After you submit, use the PayPal button to send the exact selected amount. Your request stays pending until payment is confirmed.</p>
+          </div>
+
+          <div id="etransferFields" class="payment-details hidden">
+            <p><span data-i18n="guest.sendEtransferTo">Send the e-transfer to</span> <strong id="etransferEmail">—</strong>.</p>
+            <label>
+              <span><span data-i18n="guest.senderExactName">Exact name the e-transfer is coming from</span> <strong>*</strong></span>
+              <input id="paymentSenderName" maxlength="120" data-i18n-placeholder="guest.senderExactNamePlaceholder" placeholder="Full name shown on the transfer" />
+            </label>
+            <p class="muted" data-i18n="guest.etransferConfirmationCopy">The request will stay locked until DJ Maxo confirms the transfer.</p>
+          </div>
+        </div>
       </section>
 
       <button id="submitButton" class="primary-button" type="submit">Submit Request</button>
@@ -103,6 +129,13 @@
         <span id="statusBadge" class="status-pill pending">Pending</span>
       </div>
       <p id="statusText" class="muted">Waiting for the DJ.</p>
+      <div id="paymentStatusPanel" class="payment-status-panel hidden">
+        <div>
+          <strong id="paymentStatusTitle"></strong>
+          <p id="paymentStatusText" class="muted"></p>
+        </div>
+        <a id="paypalPayButton" class="primary-button payment-paypal-button hidden" target="_blank" rel="noopener" data-i18n="guest.payWithPaypal">Pay with PayPal</a>
+      </div>
       <div id="statusLinkPreview" class="song-link-preview status-link-preview hidden"></div>
       <button id="enableAlertsButton" type="button" class="secondary-button alert-button hidden" data-i18n="guest.enableAlerts">Enable Karaoke Alerts</button>
       <div id="cantFindHelp" class="cant-find-help hidden">

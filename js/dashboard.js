@@ -40,6 +40,14 @@ const karaokePlayedList = document.querySelector('#karaokePlayedList');
 const karaokePlayedCount = document.querySelector('#karaokePlayedCount');
 const eventForm = document.querySelector('#eventForm');
 const eventsList = document.querySelector('#eventsList');
+const paymentSettingsForm = document.querySelector('#paymentSettingsForm');
+const paymentSettingsEventName = document.querySelector('#paymentSettingsEventName');
+const requireTipSetting = document.querySelector('#requireTipSetting');
+const tipOptionInputs = [...document.querySelectorAll('.tip-option-input')];
+const paypalEnabledSetting = document.querySelector('#paypalEnabledSetting');
+const paypalMeSetting = document.querySelector('#paypalMeSetting');
+const etransferEnabledSetting = document.querySelector('#etransferEnabledSetting');
+const etransferEmailSetting = document.querySelector('#etransferEmailSetting');
 const qrModal = document.querySelector('#qrModal');
 const closeQrModal = document.querySelector('#closeQrModal');
 const qrModalEventName = document.querySelector('#qrModalEventName');
@@ -123,6 +131,7 @@ async function activateEvent(eventId) {
     requestsToggle.checked = false;
     karaokeToggle.checked = false;
     tipsToggle.checked = false;
+    syncPaymentSettingsForm();
     teardownRealtime();
     clearQr(songQr);
     clearQr(karaokeQr);
@@ -134,6 +143,7 @@ async function activateEvent(eventId) {
   requestsToggle.checked = !!activeEvent.requests_enabled;
   karaokeToggle.checked = activeEvent.karaoke_enabled !== false;
   tipsToggle.checked = !!activeEvent.tips_enabled;
+  syncPaymentSettingsForm();
   renderEventLinksAndQr();
   await loadRequests();
   subscribeToRequests();
@@ -240,6 +250,9 @@ function bindRequestActions(container) {
   container.querySelectorAll('[data-action]').forEach(button => {
     button.addEventListener('click', () => updateStatus(button.dataset.id, button.dataset.action));
   });
+  container.querySelectorAll('[data-confirm-payment]').forEach(button => {
+    button.addEventListener('click', () => confirmPayment(button.dataset.confirmPayment));
+  });
 }
 
 function requestCard(row, index, type) {
@@ -254,7 +267,13 @@ function requestCard(row, index, type) {
   const preview = row.song_url
     ? `<div class="request-media-preview" data-song-preview-url="${escapeHtml(row.song_url)}" data-preview-compact="true" data-preview-title="${escapeHtml(row.song)}" data-preview-subtitle="${escapeHtml(row.artist)}" data-preview-open-label="${escapeHtml(t('dashboard.openSongLink'))}"></div>`
     : '';
-  const tip = row.tip_amount ? ` · ${escapeHtml(t('dashboard.tipSelected'))}: $${Number(row.tip_amount).toFixed(0)}` : '';
+  const tip = row.tip_amount ? ` · ${escapeHtml(t('dashboard.tipSelected'))}: $${Number(row.tip_amount).toFixed(2)}` : '';
+  const paymentPending = Number(row.tip_amount || 0) > 0 && row.payment_status === 'pending';
+  const paymentConfirmed = Number(row.tip_amount || 0) > 0 && row.payment_status === 'confirmed';
+  const methodLabel = row.payment_method === 'etransfer' ? t('dashboard.etransfer') : row.payment_method === 'paypal' ? 'PayPal' : '';
+  const paymentMeta = paymentPending
+    ? ` · ⏳ ${escapeHtml(t('dashboard.paymentPending'))}${methodLabel ? ` (${escapeHtml(methodLabel)})` : ''}`
+    : paymentConfirmed ? ` · ✓ ${escapeHtml(t('dashboard.paymentConfirmed'))}` : '';
   const duplicate = duplicateCount ? ` · 🔥 ${duplicateCount + 1} ${escapeHtml(t('dashboard.requestsPlural'))}` : '';
   const personPrefix = type === 'karaoke' ? '🎤 ' : '';
   const person = row.requester_name ? ` · ${personPrefix}${escapeHtml(row.requester_name)}` : '';
@@ -263,7 +282,20 @@ function requestCard(row, index, type) {
     : t(`status.${row.status}`);
 
   let actions = '';
-  if (row.status === 'pending' || row.status === 'cant_find') {
+  if (paymentPending && ['pending', 'cant_find'].includes(row.status)) {
+    actions = `
+      <div class="payment-confirmation-box">
+        <div>
+          <strong>${escapeHtml(t('dashboard.awaitingPayment'))}</strong>
+          <p>${escapeHtml(t('dashboard.paymentDetail', { amount: Number(row.tip_amount).toFixed(2), method: methodLabel || t('dashboard.payment') }))}${row.payment_sender_name ? ` · ${escapeHtml(t('dashboard.sender'))}: ${escapeHtml(row.payment_sender_name)}` : ''}</p>
+        </div>
+        <button class="action-button success" data-confirm-payment="${row.id}">${escapeHtml(t('dashboard.confirmPayment'))}</button>
+      </div>
+      <div class="request-actions two">
+        <button class="action-button danger" data-action="rejected" data-id="${row.id}">${escapeHtml(t('dashboard.reject'))}</button>
+        <button class="action-button" data-action="cant_find" data-id="${row.id}">${escapeHtml(t('dashboard.cantFind'))}</button>
+      </div>`;
+  } else if (row.status === 'pending' || row.status === 'cant_find') {
     actions = `
       <div class="request-actions">
         <button class="action-button primary" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.accept'))}</button>
@@ -297,7 +329,7 @@ function requestCard(row, index, type) {
             <div>
               <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
               <h3>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</h3>
-              <div class="request-meta">${escapeHtml(relativeTime(row.created_at, getLanguage()))}${person}${tip}${duplicate}</div>
+              <div class="request-meta">${escapeHtml(relativeTime(row.created_at, getLanguage()))}${person}${tip}${paymentMeta}${duplicate}</div>
             </div>
           </div>
           ${row.message ? `<p class="request-note">${escapeHtml(row.message)}</p>` : ''}
@@ -311,6 +343,11 @@ async function updateStatus(id, status) {
   const row = requests.find(item => item.id === id);
   if (!row) return;
 
+  if (row.payment_status === 'pending' && ['accepted', 'playing', 'played'].includes(status)) {
+    showDashboardNotice(t('dashboard.confirmPaymentFirst'), 'error');
+    return;
+  }
+
   const payload = { status, updated_at: new Date().toISOString() };
   if (status === 'played') payload.played_at = new Date().toISOString();
   if (status !== 'played' && row.status === 'played') payload.played_at = null;
@@ -323,6 +360,38 @@ async function updateStatus(id, status) {
 
   await broadcastGuestStatus(row, status);
   await loadRequests();
+}
+
+async function confirmPayment(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row) return;
+  const { error } = await supabase.from('song_requests').update({
+    payment_status: 'confirmed',
+    payment_confirmed_at: new Date().toISOString(),
+  }).eq('id', id);
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+  await broadcastPaymentStatus(row, 'confirmed');
+  showDashboardNotice(t('dashboard.paymentConfirmedNotice'), 'success');
+  await loadRequests();
+}
+
+async function broadcastPaymentStatus(row, paymentStatus) {
+  if (!row?.guest_token) return;
+  const channel = supabase.channel(`dropmysong-request-${row.id}-${row.guest_token}`);
+  try {
+    await channel.send({
+      type: 'broadcast',
+      event: 'payment-update',
+      payload: { request_id: row.id, payment_status: paymentStatus, updated_at: new Date().toISOString() },
+    });
+  } catch (error) {
+    console.warn('DropMySong payment broadcast failed.', error);
+  } finally {
+    supabase.removeChannel(channel);
+  }
 }
 
 async function broadcastGuestStatus(row, status) {
@@ -400,7 +469,15 @@ karaokeStatusFilter.addEventListener('change', renderKaraokeRequests);
 
 requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked, t('dashboard.requests')));
 karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
-tipsToggle.addEventListener('change', () => updateEventSetting('tips_enabled', tipsToggle.checked, t('dashboard.tips')));
+tipsToggle.addEventListener('change', async () => {
+  if (tipsToggle.checked && activeEvent && !activeEvent.paypal_enabled && !activeEvent.etransfer_enabled) {
+    tipsToggle.checked = false;
+    showDashboardNotice(t('dashboard.enablePaymentFirst'), 'error');
+    return;
+  }
+  await updateEventSetting('tips_enabled', tipsToggle.checked, t('dashboard.tipsRequired'));
+  requireTipSetting.checked = tipsToggle.checked;
+});
 
 async function updateEventSetting(field, value, label) {
   if (!activeEvent) return;
@@ -414,8 +491,82 @@ async function updateEventSetting(field, value, label) {
   }
   activeEvent[field] = value;
   events = events.map(item => item.id === activeEvent.id ? { ...item, [field]: value } : item);
+  if (field === 'tips_enabled') requireTipSetting.checked = value;
   showDashboardNotice(t(value ? 'dashboard.settingEnabled' : 'dashboard.settingDisabled', { name: label }), 'success');
 }
+
+function normalizeTipOptions(value) {
+  const list = Array.isArray(value) ? value : [2, 5, 10, 20];
+  const cleaned = list.map(Number).filter(amount => Number.isFinite(amount) && amount > 0).slice(0, 4);
+  while (cleaned.length < 4) cleaned.push([2, 5, 10, 20][cleaned.length]);
+  return cleaned;
+}
+
+function syncPaymentSettingsForm() {
+  const disabled = !activeEvent;
+  paymentSettingsForm.querySelectorAll('input,button').forEach(control => { control.disabled = disabled; });
+  paymentSettingsEventName.textContent = activeEvent ? activeEvent.name : t('dashboard.selectEventForPayments');
+  if (!activeEvent) return;
+
+  requireTipSetting.checked = !!activeEvent.tips_enabled;
+  const options = normalizeTipOptions(activeEvent.tip_options);
+  tipOptionInputs.forEach((input, index) => { input.value = options[index]; });
+  paypalEnabledSetting.checked = !!activeEvent.paypal_enabled;
+  paypalMeSetting.value = activeEvent.paypal_me_url || '';
+  etransferEnabledSetting.checked = !!activeEvent.etransfer_enabled;
+  etransferEmailSetting.value = activeEvent.etransfer_email || '';
+}
+
+paymentSettingsForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!activeEvent) return;
+
+  const tipOptions = tipOptionInputs.map(input => Number(input.value)).filter(amount => Number.isFinite(amount) && amount > 0);
+  if (tipOptions.length !== 4) {
+    showDashboardNotice(t('dashboard.fourTipAmountsRequired'), 'error');
+    return;
+  }
+
+  const paypalEnabled = paypalEnabledSetting.checked;
+  const paypalMeUrl = paypalMeSetting.value.trim();
+  const etransferEnabled = etransferEnabledSetting.checked;
+  const etransferEmail = etransferEmailSetting.value.trim();
+  const tipsRequired = requireTipSetting.checked;
+
+  if (paypalEnabled && !/^https:\/\/(www\.)?paypal\.me\/[A-Za-z0-9._-]+\/?$/i.test(paypalMeUrl)) {
+    showDashboardNotice(t('dashboard.validPaypalLinkRequired'), 'error');
+    return;
+  }
+  if (etransferEnabled && !etransferEmail) {
+    showDashboardNotice(t('dashboard.etransferEmailRequired'), 'error');
+    return;
+  }
+  if (tipsRequired && !paypalEnabled && !etransferEnabled) {
+    showDashboardNotice(t('dashboard.enablePaymentFirst'), 'error');
+    return;
+  }
+
+  const payload = {
+    tips_enabled: tipsRequired,
+    tip_options: tipOptions,
+    paypal_enabled: paypalEnabled,
+    paypal_me_url: paypalEnabled ? paypalMeUrl : null,
+    etransfer_enabled: etransferEnabled,
+    etransfer_email: etransferEnabled ? etransferEmail : null,
+  };
+
+  const { error } = await supabase.from('events').update(payload).eq('id', activeEvent.id);
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+
+  activeEvent = { ...activeEvent, ...payload };
+  events = events.map(item => item.id === activeEvent.id ? { ...item, ...payload } : item);
+  tipsToggle.checked = tipsRequired;
+  syncPaymentSettingsForm();
+  showDashboardNotice(t('dashboard.paymentSettingsSaved'), 'success');
+});
 
 copyEventLink.addEventListener('click', async () => {
   if (!activeEvent) return;
@@ -596,6 +747,7 @@ window.addEventListener('dropmysong:languagechange', () => {
   applyTranslations();
   renderEvents();
   renderAll();
+  syncPaymentSettingsForm();
   renderEventLinksAndQr();
   if (modalEvent && !qrModal.classList.contains('hidden')) renderQrModal();
   if (activeEvent) activeEventName.textContent = `${activeEvent.name}${activeEvent.is_active ? '' : ` · ${t('dashboard.inactive')}`}`;

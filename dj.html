@@ -72,7 +72,7 @@
             <i></i>
           </label>
           <label class="toggle-card">
-            <span data-i18n="dashboard.tips">Tips</span>
+            <span data-i18n="dashboard.tipsRequired">Require Tip</span>
             <input id="tipsToggle" type="checkbox" />
             <i></i>
           </label>
@@ -197,6 +197,56 @@
           <section class="panel">
             <div class="section-heading"><h2 data-i18n="dashboard.yourEvents">Your Events</h2></div>
             <div id="eventsList" class="events-list"></div>
+          </section>
+
+          <section class="panel payment-settings-panel">
+            <p class="eyebrow" data-i18n="dashboard.paymentSettingsEyebrow">PAYMENTS & TIPS</p>
+            <h2 data-i18n="dashboard.paymentSettingsTitle">Selected Event Payment Settings</h2>
+            <p id="paymentSettingsEventName" class="muted" data-i18n="dashboard.selectEventForPayments">Select an event to configure payments.</p>
+            <form id="paymentSettingsForm" class="payment-settings-form">
+              <label class="settings-toggle-row">
+                <div>
+                  <strong data-i18n="dashboard.requireTip">Require a tip for every request</strong>
+                  <small data-i18n="dashboard.requireTipCopy">When off, tips stay visible but are optional.</small>
+                </div>
+                <input id="requireTipSetting" type="checkbox" />
+              </label>
+
+              <div>
+                <strong data-i18n="dashboard.tipAmounts">Tip options</strong>
+                <p class="muted" data-i18n="dashboard.tipAmountsCopy">Choose the four amounts guests will see.</p>
+                <div class="tip-option-settings">
+                  <label>$ <input class="tip-option-input" type="number" min="0.01" step="0.01" value="2" /></label>
+                  <label>$ <input class="tip-option-input" type="number" min="0.01" step="0.01" value="5" /></label>
+                  <label>$ <input class="tip-option-input" type="number" min="0.01" step="0.01" value="10" /></label>
+                  <label>$ <input class="tip-option-input" type="number" min="0.01" step="0.01" value="20" /></label>
+                </div>
+              </div>
+
+              <div class="payment-provider-setting">
+                <label class="settings-toggle-row">
+                  <div><strong>PayPal</strong><small data-i18n="dashboard.paypalCopy">Use your PayPal.Me link for payments.</small></div>
+                  <input id="paypalEnabledSetting" type="checkbox" />
+                </label>
+                <label>
+                  <span data-i18n="dashboard.paypalMeLink">PayPal.Me link</span>
+                  <input id="paypalMeSetting" type="url" placeholder="https://paypal.me/YourName" />
+                </label>
+              </div>
+
+              <div class="payment-provider-setting">
+                <label class="settings-toggle-row">
+                  <div><strong data-i18n="dashboard.etransfer">Interac e-Transfer</strong><small data-i18n="dashboard.etransferCopy">Guests must provide the exact sender name.</small></div>
+                  <input id="etransferEnabledSetting" type="checkbox" />
+                </label>
+                <label>
+                  <span data-i18n="dashboard.etransferEmail">E-transfer email</span>
+                  <input id="etransferEmailSetting" type="email" placeholder="payments@example.com" />
+                </label>
+              </div>
+
+              <button class="primary-button" type="submit" data-i18n="dashboard.savePaymentSettings">Save Payment Settings</button>
+            </form>
           </section>
         </div>
       </section>

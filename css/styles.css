@@ -525,3 +525,83 @@ a.music-preview:hover {
   .request-media-preview .music-preview.compact { grid-template-columns: 92px minmax(0, 1fr); }
   .request-media-preview .music-preview.compact .music-preview-art { width: 92px; height: 92px; aspect-ratio: auto; }
 }
+
+/* DropMySong payments + configurable tips */
+.tip-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.tip-required-badge {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,200,87,.35);
+  background: rgba(255,200,87,.12);
+  color: #ffe39a;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.payment-methods { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(129,159,208,.18); }
+.payment-title { margin: 0 0 9px !important; color: #dce6f5 !important; font-weight: 800; }
+.payment-method-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+.payment-method {
+  min-height: 72px;
+  padding: 11px;
+  text-align: left;
+  border: 1px solid rgba(129,159,208,.28);
+  border-radius: 14px;
+  background: rgba(7,13,21,.92);
+  color: white;
+}
+.payment-method strong, .payment-method small { display: block; }
+.payment-method small { margin-top: 4px; color: var(--muted); line-height: 1.35; }
+.payment-method.active { border-color: rgba(0,194,255,.66); box-shadow: 0 0 0 2px rgba(123,44,255,.12); background: linear-gradient(135deg, rgba(0,194,255,.11), rgba(123,44,255,.12)); }
+.payment-details { margin-top: 12px; padding: 12px; border-radius: 14px; border: 1px solid rgba(129,159,208,.2); background: rgba(0,0,0,.17); }
+.payment-details label { margin-top: 10px; }
+.payment-status-panel { margin: 14px 0; padding: 13px; border-radius: 15px; border: 1px solid rgba(255,200,87,.3); background: rgba(255,200,87,.08); }
+.payment-status-panel strong { display: block; }
+.payment-status-panel p { margin: 5px 0 0; line-height: 1.5; }
+.payment-paypal-button { display: inline-flex; width: auto; margin-top: 10px; text-decoration: none; }
+
+.payment-confirmation-box {
+  margin-top: 14px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(255,200,87,.28);
+  border-radius: 14px;
+  background: rgba(255,200,87,.07);
+}
+.payment-confirmation-box p { margin: 4px 0 0; color: var(--muted); font-size: .84rem; }
+
+.payment-settings-panel { grid-column: 1 / -1; }
+.payment-settings-form { display: grid; gap: 18px; margin-top: 18px; }
+.payment-settings-form > label,
+.payment-provider-setting > label { display: block; }
+.payment-settings-form label > span,
+.payment-provider-setting label > span { display: block; margin: 0 0 7px 4px; font-size: .86rem; font-weight: 700; color: #d7deea; }
+.settings-toggle-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px;
+  border: 1px solid rgba(129,159,208,.18);
+  border-radius: 14px;
+  background: rgba(5,10,18,.58);
+}
+.settings-toggle-row strong, .settings-toggle-row small { display: block; }
+.settings-toggle-row small { margin-top: 4px; color: var(--muted); line-height: 1.35; }
+.settings-toggle-row input[type="checkbox"] { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--blue); }
+.tip-option-settings { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-top: 9px; }
+.tip-option-settings label { display: flex; align-items: center; gap: 6px; margin: 0; padding: 7px 9px; border: 1px solid rgba(129,159,208,.18); border-radius: 12px; color: #cbd5e1; }
+.tip-option-settings input { padding: 10px; }
+.payment-provider-setting { display: grid; gap: 10px; }
+.payment-settings-form input:disabled, .payment-settings-form button:disabled { opacity: .5; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .payment-method-grid, .tip-option-settings { grid-template-columns: 1fr 1fr; }
+  .payment-confirmation-box { grid-template-columns: 1fr; }
+  .payment-confirmation-box .action-button { width: 100%; }
+}
+.tip-buttons button:disabled { opacity: .42; cursor: not-allowed; }

@@ -40,6 +40,21 @@ const artistInput = document.querySelector('#artist');
 const songInput = document.querySelector('#song');
 const songLinkPreview = document.querySelector('#songLinkPreview');
 const statusLinkPreview = document.querySelector('#statusLinkPreview');
+const tipButtons = document.querySelector('#tipButtons');
+const tipRequirementCopy = document.querySelector('#tipRequirementCopy');
+const tipRequiredBadge = document.querySelector('#tipRequiredBadge');
+const paymentMethods = document.querySelector('#paymentMethods');
+const paymentMethod = document.querySelector('#paymentMethod');
+const paypalMethod = document.querySelector('#paypalMethod');
+const etransferMethod = document.querySelector('#etransferMethod');
+const paypalFields = document.querySelector('#paypalFields');
+const etransferFields = document.querySelector('#etransferFields');
+const etransferEmail = document.querySelector('#etransferEmail');
+const paymentSenderName = document.querySelector('#paymentSenderName');
+const paymentStatusPanel = document.querySelector('#paymentStatusPanel');
+const paymentStatusTitle = document.querySelector('#paymentStatusTitle');
+const paymentStatusText = document.querySelector('#paymentStatusText');
+const paypalPayButton = document.querySelector('#paypalPayButton');
 
 let requestType = params.get('type') === 'karaoke' ? 'karaoke' : 'song';
 let publicEvent = null;
@@ -52,6 +67,7 @@ let linkPreviewTimer = null;
 let previewSequence = 0;
 let lastAutoArtist = '';
 let lastAutoSong = '';
+let availableTipOptions = [2, 5, 10, 20];
 
 function mayReplaceAutoFilled(input, lastAutoValue) {
   const current = input.value.trim();
@@ -115,13 +131,27 @@ songInput.addEventListener('input', () => {
   if (songUrlInput.value.trim()) scheduleSongLinkPreview();
 });
 
-document.querySelectorAll('[data-tip]').forEach(button => {
-  button.addEventListener('click', () => {
-    const alreadyActive = button.classList.contains('active');
-    document.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
-    tipAmount.value = alreadyActive ? '' : button.dataset.tip;
-    if (!alreadyActive) button.classList.add('active');
-  });
+tipButtons.addEventListener('click', event => {
+  const button = event.target.closest('[data-tip]');
+  if (!button) return;
+  const alreadyActive = button.classList.contains('active');
+  const required = !!publicEvent?.tips_enabled;
+  tipButtons.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
+  if (alreadyActive && !required) {
+    tipAmount.value = '';
+  } else {
+    tipAmount.value = button.dataset.tip;
+    button.classList.add('active');
+  }
+  syncPaymentUi();
+});
+
+paymentMethods.addEventListener('click', event => {
+  const button = event.target.closest('[data-payment-method]');
+  if (!button || button.classList.contains('hidden')) return;
+  paymentMethod.value = button.dataset.paymentMethod;
+  paymentMethods.querySelectorAll('[data-payment-method]').forEach(item => item.classList.toggle('active', item === button));
+  syncPaymentUi();
 });
 
 requestModeButtons.forEach(button => {
@@ -136,6 +166,98 @@ function showNotice(text, type = '') {
 
 function clearNotice() {
   notice.classList.add('hidden');
+}
+
+function normalizeTipOptions(value) {
+  const list = Array.isArray(value) ? value : [2, 5, 10, 20];
+  const cleaned = list.map(Number).filter(amount => Number.isFinite(amount) && amount > 0).slice(0, 4);
+  return cleaned.length ? cleaned : [2, 5, 10, 20];
+}
+
+function renderTipOptions() {
+  availableTipOptions = normalizeTipOptions(publicEvent?.tip_options);
+  tipButtons.innerHTML = availableTipOptions.map(amount => `<button type="button" data-tip="${amount}">$${Number(amount).toLocaleString(getLanguage() === 'fr' ? 'fr-CA' : 'en-CA')}</button>`).join('');
+  const selected = Number(tipAmount.value || 0);
+  tipButtons.querySelectorAll('[data-tip]').forEach(button => button.classList.toggle('active', Number(button.dataset.tip) === selected));
+}
+
+function syncPaymentUi() {
+  const required = !!publicEvent?.tips_enabled;
+  tipsPanel.classList.remove('hidden');
+  tipRequirementCopy.textContent = t(required ? 'guest.tipCopyRequired' : 'guest.tipCopy');
+  tipRequiredBadge.classList.toggle('hidden', !required);
+
+  const hasProvider = !!publicEvent?.paypal_enabled || !!publicEvent?.etransfer_enabled;
+  if (!hasProvider) {
+    tipAmount.value = '';
+    tipButtons.querySelectorAll('[data-tip]').forEach(button => {
+      button.disabled = true;
+      button.classList.remove('active');
+    });
+    tipRequirementCopy.textContent = t('guest.tipUnavailableCopy');
+  } else {
+    tipButtons.querySelectorAll('[data-tip]').forEach(button => { button.disabled = false; });
+  }
+
+  const hasTip = Number(tipAmount.value || 0) > 0;
+  paymentMethods.classList.toggle('hidden', !hasTip || !hasProvider);
+
+  paypalMethod.classList.toggle('hidden', !publicEvent?.paypal_enabled);
+  etransferMethod.classList.toggle('hidden', !publicEvent?.etransfer_enabled);
+  etransferEmail.textContent = publicEvent?.etransfer_email || '—';
+
+  if (!hasTip) {
+    paymentMethod.value = '';
+    paymentMethods.querySelectorAll('[data-payment-method]').forEach(item => item.classList.remove('active'));
+  }
+
+  const selectedMethod = paymentMethod.value;
+  paypalFields.classList.toggle('hidden', selectedMethod !== 'paypal');
+  etransferFields.classList.toggle('hidden', selectedMethod !== 'etransfer');
+}
+
+function paypalUrlForAmount(amount) {
+  const raw = `${publicEvent?.paypal_me_url || ''}`.trim();
+  if (!raw || !amount) return '';
+  const base = raw.replace(/\/+$/, '');
+  return `${base}/${encodeURIComponent(Number(amount).toFixed(2))}CAD`;
+}
+
+function renderPaymentStatus() {
+  if (!currentRequest?.tip_amount) {
+    paymentStatusPanel.classList.add('hidden');
+    return;
+  }
+
+  paymentStatusPanel.classList.remove('hidden');
+  const amount = Number(currentRequest.tip_amount).toFixed(2);
+  const confirmed = currentRequest.payment_status === 'confirmed';
+  paymentStatusTitle.textContent = confirmed
+    ? t('guest.paymentConfirmedTitle', { amount })
+    : t('guest.paymentPendingTitle', { amount });
+
+  if (confirmed) {
+    paymentStatusText.textContent = t('guest.paymentConfirmedCopy');
+    paypalPayButton.classList.add('hidden');
+    return;
+  }
+
+  if (currentRequest.payment_method === 'etransfer') {
+    paymentStatusText.textContent = t('guest.etransferPendingCopy', {
+      amount,
+      email: currentRequest.etransfer_email || publicEvent?.etransfer_email || '',
+      name: currentRequest.payment_sender_name || '',
+    });
+    paypalPayButton.classList.add('hidden');
+  } else if (currentRequest.payment_method === 'paypal') {
+    paymentStatusText.textContent = t('guest.paypalPendingCopy');
+    const url = paypalUrlForAmount(currentRequest.tip_amount);
+    paypalPayButton.href = url || '#';
+    paypalPayButton.classList.toggle('hidden', !url);
+  } else {
+    paymentStatusText.textContent = t('guest.paymentPendingCopy');
+    paypalPayButton.classList.add('hidden');
+  }
 }
 
 function setRequestType(type, updateUrl = true) {
@@ -174,7 +296,8 @@ function syncAvailability() {
   } else {
     form.classList.remove('hidden');
   }
-  tipsPanel.classList.toggle('hidden', !publicEvent.tips_enabled);
+  renderTipOptions();
+  syncPaymentUi();
 }
 
 async function loadEvent() {
@@ -198,15 +321,18 @@ async function loadEvent() {
   // from a tiny view. This avoids replacing database functions during the upgrade.
   const { data: optionRows, error: optionsError } = await supabase
     .from('dropmysong_event_options')
-    .select('karaoke_enabled')
+    .select('karaoke_enabled,tips_enabled,tip_options,paypal_enabled,paypal_me_url,etransfer_enabled,etransfer_email')
     .eq('id', publicEvent.id)
     .limit(1);
 
   if (!optionsError && optionRows?.length) {
-    publicEvent.karaoke_enabled = optionRows[0].karaoke_enabled;
+    publicEvent = { ...publicEvent, ...optionRows[0] };
   } else {
-    // Safe fallback for an event created before the v2 toggle existed.
+    // Safe fallback for an event created before the payment settings existed.
     publicEvent.karaoke_enabled = true;
+    publicEvent.tip_options = [2, 5, 10, 20];
+    publicEvent.paypal_enabled = false;
+    publicEvent.etransfer_enabled = false;
   }
 
   renderEventBanner();
@@ -246,6 +372,34 @@ form.addEventListener('submit', async event => {
   if (requestType === 'karaoke' && !name) {
     showNotice(t('notice.singerRequired'), 'error');
     return;
+  }
+
+  const selectedTip = Number(tipAmount.value || 0);
+  const selectedPaymentMethod = paymentMethod.value;
+  const tipsRequired = !!publicEvent?.tips_enabled;
+
+  if (tipsRequired && !selectedTip) {
+    showNotice(t('notice.tipRequired'), 'error');
+    return;
+  }
+  if (selectedTip && !selectedPaymentMethod) {
+    showNotice(t('notice.paymentMethodRequired'), 'error');
+    return;
+  }
+  if (selectedPaymentMethod === 'paypal' && !publicEvent?.paypal_enabled) {
+    showNotice(t('notice.paymentUnavailable'), 'error');
+    return;
+  }
+  if (selectedPaymentMethod === 'etransfer') {
+    if (!publicEvent?.etransfer_enabled || !publicEvent?.etransfer_email) {
+      showNotice(t('notice.paymentUnavailable'), 'error');
+      return;
+    }
+    if (!paymentSenderName.value.trim()) {
+      showNotice(t('notice.senderNameRequired'), 'error');
+      paymentSenderName.focus();
+      return;
+    }
   }
 
   submitButton.disabled = true;
@@ -292,7 +446,10 @@ form.addEventListener('submit', async event => {
     song_url: songUrl || null,
     requester_name: name ? name.slice(0, 80) : null,
     message: note ? note.slice(0, 200) : null,
-    tip_amount: publicEvent.tips_enabled && tipAmount.value ? Number(tipAmount.value) : null,
+    tip_amount: selectedTip || null,
+    payment_method: selectedTip ? selectedPaymentMethod : null,
+    payment_status: selectedTip ? 'pending' : 'not_required',
+    payment_sender_name: selectedPaymentMethod === 'etransfer' ? paymentSenderName.value.trim().slice(0, 120) : null,
     guest_token: guestToken,
   });
 
@@ -305,7 +462,18 @@ form.addEventListener('submit', async event => {
     return;
   }
 
-  currentRequest = { id: requestId, artist, song, song_url: songUrl || null, request_type: requestType };
+  currentRequest = {
+    id: requestId,
+    artist,
+    song,
+    song_url: songUrl || null,
+    request_type: requestType,
+    tip_amount: selectedTip || null,
+    payment_method: selectedTip ? selectedPaymentMethod : null,
+    payment_status: selectedTip ? 'pending' : 'not_required',
+    payment_sender_name: selectedPaymentMethod === 'etransfer' ? paymentSenderName.value.trim().slice(0, 120) : null,
+    etransfer_email: publicEvent?.etransfer_email || null,
+  };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
   form.reset();
   lastAutoArtist = '';
@@ -314,7 +482,11 @@ form.addEventListener('submit', async event => {
   songLinkPreview.classList.add('hidden');
   messageCount.textContent = '0';
   tipAmount.value = '';
-  document.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
+  paymentMethod.value = '';
+  paymentSenderName.value = '';
+  tipButtons.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
+  paymentMethods.querySelectorAll('[data-payment-method]').forEach(item => item.classList.remove('active'));
+  syncPaymentUi();
   showNotice(t(requestType === 'karaoke' ? 'notice.karaokeSent' : 'notice.requestSent'), 'success');
   await refreshStatus();
   subscribeToRequestUpdates();
@@ -352,6 +524,7 @@ function renderCurrentStatus() {
   statusBadge.className = `status-pill ${currentRequest.status}`;
   statusText.textContent = t(`status.${type}.${currentRequest.status}`);
   statusPanel.classList.remove('hidden');
+  renderPaymentStatus();
   renderLinkPreviewInto(statusLinkPreview, currentRequest.song_url, {
     linked: true,
     fallbackTitle: currentRequest.song,
@@ -399,6 +572,13 @@ function subscribeToRequestUpdates() {
     .on('broadcast', { event: 'status-update' }, payload => {
       if (!payload?.payload || payload.payload.request_id !== currentRequest?.id) return;
       refreshStatus();
+    })
+    .on('broadcast', { event: 'payment-update' }, payload => {
+      if (!payload?.payload || payload.payload.request_id !== currentRequest?.id) return;
+      currentRequest = { ...currentRequest, payment_status: payload.payload.payment_status || currentRequest.payment_status };
+      localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
+      renderCurrentStatus();
+      if (currentRequest.payment_status === 'confirmed') showNotice(t('notice.paymentConfirmed'), 'success');
     })
     .subscribe(status => {
       liveIndicator.classList.toggle('online', status === 'SUBSCRIBED');
@@ -507,6 +687,8 @@ window.addEventListener('dropmysong:languagechange', () => {
   applyTranslations();
   setRequestType(requestType, false);
   renderEventBanner();
+  renderTipOptions();
+  syncPaymentUi();
   renderCurrentStatus();
   if (!karaokeReadyAlert.classList.contains('hidden') && currentRequest) {
     karaokeReadySong.textContent = `${currentRequest.artist} — ${currentRequest.song}`;
