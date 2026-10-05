@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { appBaseUrl, buildGuestUrl, escapeHtml, relativeTime, slugify } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
+import { hydrateLinkPreviews } from './linkPreview.js';
 
 const loginView = document.querySelector('#loginView');
 const dashboardView = document.querySelector('#dashboardView');
@@ -220,6 +221,7 @@ function renderSongRequests() {
   }
   requestList.innerHTML = list.map((row, index) => requestCard(row, index, 'song')).join('');
   bindRequestActions(requestList);
+  hydrateLinkPreviews(requestList, { compact: true, openLabel: t('dashboard.openSongLink') });
 }
 
 function renderKaraokeRequests() {
@@ -231,6 +233,7 @@ function renderKaraokeRequests() {
   }
   karaokeList.innerHTML = list.map((row, index) => requestCard(row, index, 'karaoke')).join('');
   bindRequestActions(karaokeList);
+  hydrateLinkPreviews(karaokeList, { compact: true, openLabel: t('dashboard.openSongLink') });
 }
 
 function bindRequestActions(container) {
@@ -248,8 +251,8 @@ function requestCard(row, index, type) {
     `${other.song}`.trim().toLowerCase() === `${row.song}`.trim().toLowerCase()
   ).length;
 
-  const link = row.song_url
-    ? `<a class="request-link" href="${escapeHtml(row.song_url)}" target="_blank" rel="noopener">${escapeHtml(t('dashboard.openSongLink'))}</a>`
+  const preview = row.song_url
+    ? `<div class="request-media-preview" data-song-preview-url="${escapeHtml(row.song_url)}" data-preview-compact="true" data-preview-title="${escapeHtml(row.song)}" data-preview-subtitle="${escapeHtml(row.artist)}" data-preview-open-label="${escapeHtml(t('dashboard.openSongLink'))}"></div>`
     : '';
   const tip = row.tip_amount ? ` · ${escapeHtml(t('dashboard.tipSelected'))}: $${Number(row.tip_amount).toFixed(0)}` : '';
   const duplicate = duplicateCount ? ` · 🔥 ${duplicateCount + 1} ${escapeHtml(t('dashboard.requestsPlural'))}` : '';
@@ -287,16 +290,20 @@ function requestCard(row, index, type) {
 
   return `
     <article class="request-card ${index === 0 ? 'highlight' : ''} ${type === 'karaoke' ? 'karaoke-card' : ''}">
-      <div class="request-card-head">
-        <div>
-          <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
-          <h3>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</h3>
-          <div class="request-meta">${escapeHtml(relativeTime(row.created_at, getLanguage()))}${person}${tip}${duplicate}</div>
+      <div class="request-card-layout ${preview ? 'has-preview' : ''}">
+        ${preview}
+        <div class="request-card-body">
+          <div class="request-card-head">
+            <div>
+              <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
+              <h3>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</h3>
+              <div class="request-meta">${escapeHtml(relativeTime(row.created_at, getLanguage()))}${person}${tip}${duplicate}</div>
+            </div>
+          </div>
+          ${row.message ? `<p class="request-note">${escapeHtml(row.message)}</p>` : ''}
+          ${actions}
         </div>
-        ${link}
       </div>
-      ${row.message ? `<p class="request-note">${escapeHtml(row.message)}</p>` : ''}
-      ${actions}
     </article>`;
 }
 

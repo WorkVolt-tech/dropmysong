@@ -59,6 +59,8 @@
         <input id="songUrl" name="songUrl" type="url" inputmode="url" data-i18n-placeholder="guest.songLinkPlaceholder" placeholder="YouTube, Spotify, Apple Music, SoundCloud..." />
       </label>
 
+      <div id="songLinkPreview" class="song-link-preview hidden" aria-live="polite"></div>
+
       <label>
         <span id="requesterLabel"><span id="requesterLabelText" data-i18n="guest.yourName">Your Name</span> <small id="requesterOptional" data-i18n="guest.optional">(optional)</small><strong id="requesterRequired" class="hidden"> *</strong></span>
         <input id="requesterName" name="requesterName" maxlength="80" data-i18n-placeholder="guest.namePlaceholder" placeholder="How should the DJ recognize you?" />
@@ -99,6 +101,7 @@
         <span id="statusBadge" class="status-pill pending">Pending</span>
       </div>
       <p id="statusText" class="muted">Waiting for the DJ.</p>
+      <div id="statusLinkPreview" class="song-link-preview status-link-preview hidden"></div>
       <button id="enableAlertsButton" type="button" class="secondary-button alert-button hidden" data-i18n="guest.enableAlerts">Enable Karaoke Alerts</button>
       <div id="cantFindHelp" class="cant-find-help hidden">
         <p data-i18n="guest.cantFindCopy">DJ Maxo couldn't find this version. Add a direct song link to help.</p>

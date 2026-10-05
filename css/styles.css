@@ -408,3 +408,120 @@ textarea { resize: vertical; }
   .event-item { grid-template-columns: 1fr; }
   .event-actions { justify-content: flex-start; }
 }
+
+/* DropMySong link previews */
+.song-link-preview { margin: -2px 0 16px; }
+.status-link-preview { margin: 12px 0 4px; }
+.music-preview {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 13px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(111,140,184,.24);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(11,18,29,.98), rgba(9,14,23,.94));
+  color: inherit;
+  text-decoration: none;
+  overflow: hidden;
+  transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+a.music-preview:hover {
+  transform: translateY(-1px);
+  border-color: rgba(0,194,255,.48);
+  box-shadow: 0 10px 28px rgba(0,0,0,.24), 0 0 24px rgba(64,80,255,.08);
+}
+.music-preview-art-wrap { position: relative; min-width: 0; }
+.music-preview-art {
+  width: 104px;
+  height: 104px;
+  display: block;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #111827;
+}
+.music-preview-provider {
+  position: absolute;
+  left: 7px;
+  bottom: 7px;
+  max-width: calc(100% - 14px);
+  padding: 4px 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(0,0,0,.76);
+  color: white;
+  font-size: .62rem;
+  font-weight: 900;
+  letter-spacing: .02em;
+  backdrop-filter: blur(8px);
+}
+.music-preview-provider.provider-spotify { background: rgba(24, 160, 80, .9); }
+.music-preview-provider.provider-youtube { background: rgba(221, 0, 0, .9); }
+.music-preview-provider.provider-soundcloud { background: rgba(255, 85, 0, .92); }
+.music-preview-provider.provider-apple { background: rgba(230, 43, 80, .9); }
+.music-preview-info { min-width: 0; display: grid; gap: 5px; }
+.music-preview-title {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-size: .98rem;
+  line-height: 1.25;
+  color: #f8fbff;
+}
+.music-preview-subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: .82rem;
+}
+.music-preview-open { color: #79ddff; font-size: .76rem; font-weight: 800; }
+.music-preview.compact {
+  grid-template-columns: 88px minmax(0, 1fr);
+  padding: 8px;
+  border-radius: 14px;
+}
+.music-preview.compact .music-preview-art { width: 88px; height: 88px; border-radius: 10px; }
+.music-preview.compact .music-preview-title { font-size: .9rem; }
+.music-preview.compact .music-preview-provider { font-size: .57rem; }
+.music-preview-skeleton { position: relative; overflow: hidden; }
+.music-preview-skeleton::after,
+.preview-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent);
+  animation: previewShimmer 1.15s infinite;
+}
+.preview-line { position: relative; display: block; width: 72%; height: 12px; border-radius: 999px; overflow: hidden; background: rgba(135,156,188,.12); }
+.preview-line.short { width: 48%; height: 9px; }
+@keyframes previewShimmer { to { transform: translateX(100%); } }
+
+.request-card-layout { display: grid; gap: 14px; }
+.request-card-layout.has-preview { grid-template-columns: 210px minmax(0, 1fr); align-items: start; }
+.request-card-body { min-width: 0; }
+.request-media-preview .music-preview.compact {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  height: 100%;
+}
+.request-media-preview .music-preview.compact .music-preview-art-wrap { width: 100%; }
+.request-media-preview .music-preview.compact .music-preview-art {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+.request-media-preview .music-preview-info { padding: 0 2px 2px; }
+
+@media (max-width: 720px) {
+  .music-preview { grid-template-columns: 84px minmax(0, 1fr); }
+  .music-preview-art { width: 84px; height: 84px; }
+  .request-card-layout.has-preview { grid-template-columns: 1fr; }
+  .request-media-preview .music-preview.compact { grid-template-columns: 92px minmax(0, 1fr); }
+  .request-media-preview .music-preview.compact .music-preview-art { width: 92px; height: 92px; aspect-ratio: auto; }
+}

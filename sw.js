@@ -1,7 +1,7 @@
-const CACHE = 'dropmysong-v2';
+const CACHE = 'dropmysong-v3-link-preview';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './css/styles.css',
-  './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/request.js', './js/dashboard.js', './js/register-sw.js',
+  './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/register-sw.js',
   './assets/dj-maxo-logo.png', './assets/icon-192.png', './assets/icon-512.png'
 ];
 

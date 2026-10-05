@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { escapeHtml, getOrCreateGuestToken, isHttpUrl } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
+import { renderLinkPreviewInto } from './linkPreview.js';
 
 const params = new URLSearchParams(location.search);
 const eventSlug = params.get('event');
@@ -34,6 +35,11 @@ const liveIndicator = document.querySelector('#liveIndicator');
 const karaokeReadyAlert = document.querySelector('#karaokeReadyAlert');
 const karaokeReadySong = document.querySelector('#karaokeReadySong');
 const readyAcknowledge = document.querySelector('#readyAcknowledge');
+const songUrlInput = document.querySelector('#songUrl');
+const artistInput = document.querySelector('#artist');
+const songInput = document.querySelector('#song');
+const songLinkPreview = document.querySelector('#songLinkPreview');
+const statusLinkPreview = document.querySelector('#statusLinkPreview');
 
 let requestType = params.get('type') === 'karaoke' ? 'karaoke' : 'song';
 let publicEvent = null;
@@ -42,12 +48,42 @@ let pollTimer = null;
 let requestRealtime = null;
 let readyAnnouncementVersion = null;
 let audioContext = null;
+let linkPreviewTimer = null;
+let previewSequence = 0;
+
+function scheduleSongLinkPreview() {
+  clearTimeout(linkPreviewTimer);
+  const value = songUrlInput.value.trim();
+  if (!value) {
+    songLinkPreview.innerHTML = '';
+    songLinkPreview.classList.add('hidden');
+    return;
+  }
+  const sequence = ++previewSequence;
+  linkPreviewTimer = setTimeout(async () => {
+    songLinkPreview.dataset.previewUrl = value;
+    await renderLinkPreviewInto(songLinkPreview, value, {
+      linked: true,
+      fallbackTitle: songInput.value.trim(),
+      fallbackSubtitle: artistInput.value.trim(),
+    });
+    if (sequence !== previewSequence) return;
+  }, 320);
+}
 
 initI18n();
 setRequestType(requestType, false);
 
 message.addEventListener('input', () => {
   messageCount.textContent = message.value.length;
+});
+
+songUrlInput.addEventListener('input', scheduleSongLinkPreview);
+artistInput.addEventListener('input', () => {
+  if (songUrlInput.value.trim()) scheduleSongLinkPreview();
+});
+songInput.addEventListener('input', () => {
+  if (songUrlInput.value.trim()) scheduleSongLinkPreview();
 });
 
 document.querySelectorAll('[data-tip]').forEach(button => {
@@ -161,9 +197,9 @@ form.addEventListener('submit', async event => {
   clearNotice();
   primeAudio();
 
-  const artist = document.querySelector('#artist').value.trim();
-  const song = document.querySelector('#song').value.trim();
-  const songUrl = document.querySelector('#songUrl').value.trim();
+  const artist = artistInput.value.trim();
+  const song = songInput.value.trim();
+  const songUrl = songUrlInput.value.trim();
   const name = requesterName.value.trim();
   const note = message.value.trim();
 
@@ -206,9 +242,11 @@ form.addEventListener('submit', async event => {
     return;
   }
 
-  currentRequest = { id: requestId, artist, song, request_type: requestType };
+  currentRequest = { id: requestId, artist, song, song_url: songUrl || null, request_type: requestType };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
   form.reset();
+  songLinkPreview.innerHTML = '';
+  songLinkPreview.classList.add('hidden');
   messageCount.textContent = '0';
   tipAmount.value = '';
   document.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
@@ -249,6 +287,11 @@ function renderCurrentStatus() {
   statusBadge.className = `status-pill ${currentRequest.status}`;
   statusText.textContent = t(`status.${type}.${currentRequest.status}`);
   statusPanel.classList.remove('hidden');
+  renderLinkPreviewInto(statusLinkPreview, currentRequest.song_url, {
+    linked: true,
+    fallbackTitle: currentRequest.song,
+    fallbackSubtitle: currentRequest.artist,
+  });
   cantFindHelp.classList.toggle('hidden', currentRequest.status !== 'cant_find');
   enableAlertsButton.classList.toggle('hidden', type !== 'karaoke' || !('Notification' in window) || Notification.permission === 'granted');
 }
@@ -321,6 +364,8 @@ saveHelpLink.addEventListener('click', async () => {
     return;
   }
   helpSongUrl.value = '';
+  currentRequest = { ...currentRequest, song_url: url };
+  renderCurrentStatus();
   showNotice(t('notice.linkSaved'), 'success');
   await refreshStatus();
 });
