@@ -251,28 +251,26 @@
               </div>
 
               <div class="payment-provider-setting">
-                <label class="settings-toggle-row">
-                  <div><strong>PayPal</strong><small data-i18n="dashboard.paypalCopy">Use your PayPal.Me link for payments.</small></div>
-                  <input id="paypalEnabledSetting" type="checkbox" />
-                </label>
-                <label>
-                  <span data-i18n="dashboard.paypalMeLink">PayPal.Me link</span>
-                  <input id="paypalMeSetting" type="url" placeholder="https://paypal.me/YourName" />
-                </label>
+                <div class="settings-toggle-row">
+                  <div>
+                    <strong>PayPal</strong>
+                    <small data-i18n="dashboard.paymentFixedCopy">Configured globally for DJ Maxo.</small>
+                  </div>
+                  <strong id="paypalConfiguredValue">https://paypal.me/chezmaxo</strong>
+                </div>
               </div>
 
               <div class="payment-provider-setting">
-                <label class="settings-toggle-row">
-                  <div><strong data-i18n="dashboard.etransfer">Interac e-Transfer</strong><small data-i18n="dashboard.etransferCopy">Guests must provide the exact sender name.</small></div>
-                  <input id="etransferEnabledSetting" type="checkbox" />
-                </label>
-                <label>
-                  <span data-i18n="dashboard.etransferEmail">E-transfer email</span>
-                  <input id="etransferEmailSetting" type="email" placeholder="payments@example.com" />
-                </label>
+                <div class="settings-toggle-row">
+                  <div>
+                    <strong data-i18n="dashboard.etransfer">Interac e-Transfer</strong>
+                    <small data-i18n="dashboard.paymentFixedCopy">Configured globally for DJ Maxo.</small>
+                  </div>
+                  <strong id="etransferConfiguredValue">djmaxo4fun@gmail.com</strong>
+                </div>
               </div>
 
-              <button class="primary-button" type="submit" data-i18n="dashboard.savePaymentSettings">Save Payment Settings</button>
+              <button class="primary-button" type="submit" data-i18n="dashboard.saveTipSettings">Save Tip Settings</button>
             </form>
           </section>
         </div>
