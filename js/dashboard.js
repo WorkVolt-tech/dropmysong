@@ -291,16 +291,24 @@ function requestCard(row, index, type, canReorder = false) {
   const preview = row.song_url
     ? `<div class="request-media-preview" data-song-preview-url="${escapeHtml(row.song_url)}" data-preview-compact="true" data-preview-title="${escapeHtml(row.song)}" data-preview-subtitle="${escapeHtml(row.artist)}" data-preview-open-label="${escapeHtml(t('dashboard.openSongLink'))}"></div>`
     : '';
-  const tip = row.tip_amount ? ` · ${escapeHtml(t('dashboard.tipSelected'))}: $${Number(row.tip_amount).toFixed(2)}` : '';
   const paymentPending = Number(row.tip_amount || 0) > 0 && row.payment_status === 'pending';
   const paymentConfirmed = Number(row.tip_amount || 0) > 0 && row.payment_status === 'confirmed';
   const methodLabel = row.payment_method === 'etransfer' ? t('dashboard.etransfer') : row.payment_method === 'paypal' ? 'PayPal' : '';
-  const paymentMeta = paymentPending
-    ? ` · ⏳ ${escapeHtml(t('dashboard.paymentPending'))}${methodLabel ? ` (${escapeHtml(methodLabel)})` : ''}`
-    : paymentConfirmed ? ` · ✓ ${escapeHtml(t('dashboard.paymentConfirmed'))}` : '';
-  const duplicate = duplicateCount ? ` · 🔥 ${duplicateCount + 1} ${escapeHtml(t('dashboard.requestsPlural'))}` : '';
-  const personPrefix = type === 'karaoke' ? '🎤 ' : '';
-  const person = row.requester_name ? ` · ${personPrefix}${escapeHtml(row.requester_name)}` : '';
+  const personPrefix = type === 'karaoke' ? '🎤 ' : '👤 ';
+  const personBadge = row.requester_name
+    ? `<span class="request-meta-chip person">${personPrefix}${escapeHtml(row.requester_name)}</span>`
+    : '';
+  const tipBadge = row.tip_amount
+    ? `<span class="request-meta-chip tip">♥ ${Number(row.tip_amount).toFixed(2)}</span>`
+    : '';
+  const paymentBadge = paymentPending
+    ? `<span class="request-meta-chip payment pending">⏳ ${escapeHtml(t('dashboard.paymentPending'))}${methodLabel ? ` · ${escapeHtml(methodLabel)}` : ''}</span>`
+    : paymentConfirmed
+      ? `<span class="request-meta-chip payment confirmed">✓ ${escapeHtml(t('dashboard.paymentConfirmed'))}</span>`
+      : '';
+  const duplicateBadge = duplicateCount
+    ? `<span class="request-meta-chip duplicate">🔥 ${duplicateCount + 1} ${escapeHtml(t('dashboard.requestsPlural'))}</span>`
+    : '';
   const statusLabel = type === 'karaoke'
     ? t(`status.karaoke.${row.status}Label`)
     : t(`status.${row.status}`);
@@ -358,13 +366,18 @@ function requestCard(row, index, type, canReorder = false) {
         ${preview}
         <div class="request-card-body">
           <div class="request-card-head">
-            <div>
-              <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
-              <h3>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</h3>
-              <div class="request-meta">${escapeHtml(relativeTime(row.created_at, getLanguage()))}${person}${tip}${paymentMeta}${duplicate}</div>
+            <div class="request-card-title-block">
+              <div class="request-card-kicker">
+                <span class="request-number">#${index + 1}</span>
+                <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
+                <span class="request-time">${escapeHtml(relativeTime(row.created_at, getLanguage()))}</span>
+              </div>
+              <p class="request-artist">${escapeHtml(row.artist)}</p>
+              <h3>${escapeHtml(row.song)}</h3>
+              <div class="request-meta">${personBadge}${tipBadge}${paymentBadge}${duplicateBadge}</div>
             </div>
           </div>
-          ${row.message ? `<p class="request-note">${escapeHtml(row.message)}</p>` : ''}
+          ${row.message ? `<p class="request-note">“${escapeHtml(row.message)}”</p>` : ''}
           ${actions}
         </div>
       </div>
@@ -546,7 +559,7 @@ function renderSongSideRail() {
   const next = rows.filter(row => row.status === 'accepted').slice(0, 8);
   nextUpCount.textContent = next.length;
   nextUpList.innerHTML = next.length
-    ? next.map((row, index) => `<div class="mini-item"><strong>${index + 1}. ${escapeHtml(row.song)}</strong><span class="muted">${escapeHtml(row.artist)}</span></div>`).join('')
+    ? next.map((row, index) => `<div class="mini-item queue-mini-item"><span class="mini-rank">${index + 1}</span><div><strong>${escapeHtml(row.song)}</strong><span class="muted">${escapeHtml(row.artist)}</span></div></div>`).join('')
     : `<div class="empty-state">${escapeHtml(t('dashboard.noAccepted'))}</div>`;
 }
 
@@ -560,7 +573,7 @@ function renderKaraokeSideRail() {
   const next = rows.filter(row => row.status === 'accepted').slice(0, 8);
   karaokeNextCount.textContent = next.length;
   karaokeNextList.innerHTML = next.length
-    ? next.map((row, index) => `<div class="mini-item"><strong>${index + 1}. ${escapeHtml(row.requester_name || t('request.singer'))}</strong><span class="muted">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div>`).join('')
+    ? next.map((row, index) => `<div class="mini-item queue-mini-item"><span class="mini-rank">${index + 1}</span><div><strong>${escapeHtml(row.requester_name || t('request.singer'))}</strong><span class="muted">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div></div>`).join('')
     : `<div class="empty-state">${escapeHtml(t('dashboard.noKaraokeAccepted'))}</div>`;
 }
 
