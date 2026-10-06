@@ -54,6 +54,12 @@ const hostDisplayName = document.querySelector('#hostDisplayName');
 const hostEmail = document.querySelector('#hostEmail');
 const eventHostsList = document.querySelector('#eventHostsList');
 const copyHostLoginLink = document.querySelector('#copyHostLoginLink');
+const generateHostQr = document.querySelector('#generateHostQr');
+const regenerateHostQr = document.querySelector('#regenerateHostQr');
+const copyHostInviteLink = document.querySelector('#copyHostInviteLink');
+const hostInviteQrWrap = document.querySelector('#hostInviteQrWrap');
+const hostInviteQr = document.querySelector('#hostInviteQr');
+const hostInviteLink = document.querySelector('#hostInviteLink');
 const qrModal = document.querySelector('#qrModal');
 const closeQrModal = document.querySelector('#closeQrModal');
 const qrModalEventName = document.querySelector('#qrModalEventName');
@@ -71,6 +77,9 @@ let currentTab = 'queue';
 let modalEvent = null;
 let noticeTimer = null;
 let eventHosts = [];
+let hostAccessReady = true;
+let hostInviteUrl = '';
+let hostInviteEventId = null;
 let queueReorderInProgress = false;
 
 initI18n();
@@ -140,6 +149,7 @@ async function activateEvent(eventId) {
     karaokeToggle.checked = false;
     tipsToggle.checked = false;
     syncPaymentSettingsForm();
+    clearHostInviteQr();
     syncHostAccessPanel();
     teardownRealtime();
     clearQr(songQr);
@@ -153,6 +163,7 @@ async function activateEvent(eventId) {
   karaokeToggle.checked = activeEvent.karaoke_enabled !== false;
   tipsToggle.checked = !!activeEvent.tips_enabled;
   syncPaymentSettingsForm();
+  clearHostInviteQr();
   await loadEventHosts();
   renderEventLinksAndQr();
   await loadRequests();
@@ -689,6 +700,7 @@ paymentSettingsForm.addEventListener('submit', async event => {
 
 async function loadEventHosts() {
   eventHosts = [];
+  hostAccessReady = true;
   if (!activeEvent) {
     syncHostAccessPanel();
     return;
@@ -701,8 +713,8 @@ async function loadEventHosts() {
     .order('created_at', { ascending: true });
 
   if (error) {
-    eventHostsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.hostSetupRequired'))}</div>`;
-    hostAccessEventName.textContent = activeEvent.name;
+    hostAccessReady = false;
+    syncHostAccessPanel();
     return;
   }
 
@@ -711,13 +723,21 @@ async function loadEventHosts() {
 }
 
 function syncHostAccessPanel() {
-  const disabled = !activeEvent;
+  const disabled = !activeEvent || !hostAccessReady;
   hostAccessForm.querySelectorAll('input,button').forEach(control => { control.disabled = disabled; });
+  generateHostQr.disabled = disabled;
+  regenerateHostQr.disabled = disabled;
+  copyHostInviteLink.disabled = !hostInviteUrl;
   copyHostLoginLink.disabled = false;
   hostAccessEventName.textContent = activeEvent ? activeEvent.name : t('dashboard.selectEventForHost');
 
   if (!activeEvent) {
     eventHostsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.selectEventForHost'))}</div>`;
+    return;
+  }
+
+  if (!hostAccessReady) {
+    eventHostsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.hostSetupRequired'))}</div>`;
     return;
   }
 
@@ -790,6 +810,107 @@ async function removeEventHost(hostId) {
   await loadEventHosts();
   showDashboardNotice(t('dashboard.hostRemoved'), 'success');
 }
+
+function clearHostInviteQr() {
+  hostInviteUrl = '';
+  hostInviteEventId = null;
+  hostInviteLink.textContent = '';
+  hostInviteQr.innerHTML = '';
+  hostInviteQrWrap.classList.add('hidden');
+  if (copyHostInviteLink) copyHostInviteLink.disabled = true;
+}
+
+function randomHostInviteToken() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  let binary = '';
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function renderHostInviteQr(url) {
+  hostInviteQr.innerHTML = '';
+  hostInviteLink.textContent = url;
+  hostInviteQrWrap.classList.remove('hidden');
+  if (window.QRCode) {
+    new window.QRCode(hostInviteQr, {
+      text: url,
+      width: 180,
+      height: 180,
+      colorDark: '#05070b',
+      colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.M,
+    });
+  } else {
+    hostInviteQr.innerHTML = `<div class="empty-state">${escapeHtml(url)}</div>`;
+  }
+  copyHostInviteLink.disabled = false;
+}
+
+async function createHostQrInvite() {
+  if (!activeEvent || !hostAccessReady) {
+    showDashboardNotice(t('dashboard.hostSetupRequired'), 'error');
+    return;
+  }
+
+  generateHostQr.disabled = true;
+  regenerateHostQr.disabled = true;
+
+  const token = randomHostInviteToken();
+  const tokenHash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  const { error: deleteError } = await supabase
+    .from('host_invites')
+    .delete()
+    .eq('event_id', activeEvent.id)
+    .is('claimed_at', null);
+
+  if (deleteError) {
+    generateHostQr.disabled = false;
+    regenerateHostQr.disabled = false;
+    showDashboardNotice(t('dashboard.hostSetupRequired'), 'error');
+    return;
+  }
+
+  const { error } = await supabase.from('host_invites').insert({
+    event_id: activeEvent.id,
+    token_hash: tokenHash,
+    event_name: activeEvent.name,
+    event_slug: activeEvent.slug,
+    created_by: session?.user?.id || null,
+    expires_at: expiresAt,
+  });
+
+  generateHostQr.disabled = false;
+  regenerateHostQr.disabled = false;
+
+  if (error) {
+    showDashboardNotice(error.message || t('dashboard.hostInviteCreateFailed'), 'error');
+    return;
+  }
+
+  const url = new URL('host.html', appBaseUrl());
+  url.searchParams.set('invite', token);
+  hostInviteUrl = url.toString();
+  hostInviteEventId = activeEvent.id;
+  renderHostInviteQr(hostInviteUrl);
+  showDashboardNotice(t('dashboard.hostInviteCreated'), 'success');
+}
+
+generateHostQr.addEventListener('click', createHostQrInvite);
+regenerateHostQr.addEventListener('click', createHostQrInvite);
+
+copyHostInviteLink.addEventListener('click', async () => {
+  if (!hostInviteUrl || hostInviteEventId !== activeEvent?.id) return;
+  await copyText(hostInviteUrl);
+  showDashboardNotice(t('dashboard.hostInviteLinkCopied'), 'success');
+});
 
 copyHostLoginLink.addEventListener('click', async () => {
   const url = new URL('host.html', appBaseUrl()).toString();
