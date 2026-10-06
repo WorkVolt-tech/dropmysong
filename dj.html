@@ -42,6 +42,7 @@
         <button class="nav-item active" data-tab="queue" data-i18n="dashboard.queue">Song Requests</button>
         <button class="nav-item" data-tab="karaoke" data-i18n="dashboard.karaoke">Karaoke</button>
         <button class="nav-item" data-tab="played" data-i18n="dashboard.played">History</button>
+        <button class="nav-item" data-tab="analytics" data-i18n="dashboard.analytics">Analytics</button>
         <button class="nav-item" data-tab="events" data-i18n="dashboard.events">Events</button>
       </nav>
       <div class="sidebar-bottom">
@@ -179,6 +180,94 @@
             <div id="karaokePlayedList" class="played-list"></div>
           </section>
         </div>
+      </section>
+
+      <section id="analyticsTab" class="tab-panel hidden">
+        <section class="analytics-toolbar panel">
+          <div>
+            <p class="eyebrow" data-i18n="analytics.eyebrow">EVENT INSIGHTS</p>
+            <h2 data-i18n="analytics.title">Analytics & Event Archive</h2>
+            <p class="muted" data-i18n="analytics.copy">Review a night, see what people requested, track confirmed tips, and keep past events without deleting them.</p>
+          </div>
+          <div class="analytics-controls">
+            <label>
+              <span data-i18n="analytics.chooseEvent">Event</span>
+              <select id="analyticsEventSelect"></select>
+            </label>
+            <button id="exportAnalyticsCsv" class="secondary-button" type="button" data-i18n="analytics.exportPlaylist">Export Played CSV</button>
+          </div>
+        </section>
+
+        <section id="analyticsEmpty" class="panel empty-state hidden" data-i18n="analytics.noEvent">Create an event to start collecting analytics.</section>
+
+        <div id="analyticsContent">
+          <section class="analytics-kpis">
+            <article class="panel analytics-kpi">
+              <span data-i18n="analytics.totalRequests">Total Requests</span>
+              <strong id="analyticsTotalRequests">0</strong>
+              <small id="analyticsTotalBreakdown" class="muted">0 songs · 0 karaoke</small>
+            </article>
+            <article class="panel analytics-kpi">
+              <span data-i18n="analytics.played">Played / Completed</span>
+              <strong id="analyticsPlayed">0</strong>
+              <small id="analyticsCompletionRate" class="muted">0% completion</small>
+            </article>
+            <article class="panel analytics-kpi">
+              <span data-i18n="analytics.confirmedTips">Confirmed Tips</span>
+              <strong id="analyticsConfirmedTips">$0.00</strong>
+              <small id="analyticsPendingTips" class="muted">$0.00 pending</small>
+            </article>
+            <article class="panel analytics-kpi">
+              <span data-i18n="analytics.rejected">Rejected / Can't Find</span>
+              <strong id="analyticsRejected">0</strong>
+              <small id="analyticsRejectedBreakdown" class="muted">0 rejected · 0 can't find</small>
+            </article>
+          </section>
+
+          <section class="analytics-grid">
+            <article class="panel analytics-panel">
+              <div class="section-heading">
+                <h2 data-i18n="analytics.topTracks">Most Requested Tracks</h2>
+                <span id="analyticsTrackCount" class="count-badge">0</span>
+              </div>
+              <div id="analyticsTopTracks" class="analytics-rank-list"></div>
+            </article>
+
+            <article class="panel analytics-panel">
+              <div class="section-heading">
+                <h2 data-i18n="analytics.topArtists">Top Artists</h2>
+                <span id="analyticsArtistCount" class="count-badge">0</span>
+              </div>
+              <div id="analyticsTopArtists" class="analytics-rank-list"></div>
+            </article>
+
+            <article class="panel analytics-panel analytics-status-panel">
+              <div class="section-heading">
+                <h2 data-i18n="analytics.statusMix">Request Status</h2>
+              </div>
+              <div id="analyticsStatusMix" class="analytics-status-list"></div>
+            </article>
+
+            <article class="panel analytics-panel analytics-recent-panel">
+              <div class="section-heading">
+                <h2 data-i18n="analytics.recentPlayed">Recently Played</h2>
+              </div>
+              <div id="analyticsRecentPlayed" class="analytics-rank-list"></div>
+            </article>
+          </section>
+        </div>
+
+        <section class="panel archive-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow" data-i18n="analytics.archiveEyebrow">EVENT ARCHIVE</p>
+              <h2 data-i18n="analytics.archiveTitle">Archived Events</h2>
+            </div>
+            <span id="archivedEventCount" class="count-badge">0</span>
+          </div>
+          <p class="muted" data-i18n="analytics.archiveCopy">Archiving keeps all requests, karaoke history and analytics. Nothing is deleted.</p>
+          <div id="archivedEventsList" class="archive-list"></div>
+        </section>
       </section>
 
       <section id="eventsTab" class="tab-panel hidden">
