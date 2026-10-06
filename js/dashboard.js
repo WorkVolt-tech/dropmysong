@@ -1174,6 +1174,7 @@ function renderArchivedEvents() {
         <div class="archive-actions">
           <button class="secondary-button" type="button" data-analytics-event="${event.id}">${escapeHtml(t('analytics.viewAnalytics'))}</button>
           <button class="ghost-button" type="button" data-restore-event="${event.id}">${escapeHtml(t('analytics.restoreEvent'))}</button>
+          <button class="ghost-button delete-event-button" type="button" data-delete-event="${event.id}">${escapeHtml(t('analytics.deletePermanently'))}</button>
         </div>
       </article>`;
   }).join('');
@@ -1190,6 +1191,50 @@ function renderArchivedEvents() {
   archivedEventsList.querySelectorAll('[data-restore-event]').forEach(button => {
     button.addEventListener('click', () => restoreArchivedEvent(button.dataset.restoreEvent));
   });
+
+  archivedEventsList.querySelectorAll('[data-delete-event]').forEach(button => {
+    button.addEventListener('click', () => permanentlyDeleteEvent(button.dataset.deleteEvent));
+  });
+}
+
+async function permanentlyDeleteEvent(id) {
+  const event = events.find(item => item.id === id && item.archived_at);
+  if (!event) return;
+
+  const confirmation = window.prompt(t('analytics.deleteConfirm', { name: event.name }));
+  if (confirmation === null) return;
+  if (confirmation.trim() !== event.name) {
+    showDashboardNotice(t('analytics.deleteNameMismatch'), 'error');
+    return;
+  }
+
+  const { data, error } = await supabase.rpc('delete_owned_event', {
+    p_event_id: event.id,
+  });
+
+  if (error) {
+    const message = error.message?.includes('delete_owned_event')
+      ? t('analytics.deleteSetupRequired')
+      : error.message;
+    showDashboardNotice(message || t('analytics.deleteFailed'), 'error');
+    return;
+  }
+
+  if (!data) {
+    showDashboardNotice(t('analytics.deleteFailed'), 'error');
+    return;
+  }
+
+  if (analyticsEventId === event.id) {
+    analyticsEventId = null;
+    analyticsRows = [];
+  }
+
+  showDashboardNotice(t('analytics.eventDeleted'), 'success');
+  await loadEvents();
+  renderAnalyticsEventOptions();
+  renderArchivedEvents();
+  if (currentTab === 'analytics') await loadAnalytics();
 }
 
 analyticsEventSelect.addEventListener('change', () => {
