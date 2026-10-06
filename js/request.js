@@ -359,6 +359,13 @@ form.addEventListener('submit', async event => {
   clearNotice();
   primeAudio();
 
+  // Use the mode that is visibly selected at the exact moment of submission.
+  // This prevents a stale URL/state value from ever saving a Song as Karaoke
+  // (or vice versa).
+  const activeModeButton = requestModeButtons.find(button => button.classList.contains('active'));
+  const submissionType = activeModeButton?.dataset.requestType === 'karaoke' ? 'karaoke' : 'song';
+  requestType = submissionType;
+
   let artist = artistInput.value.trim();
   let song = songInput.value.trim();
   const songUrl = songUrlInput.value.trim();
@@ -377,7 +384,7 @@ form.addEventListener('submit', async event => {
     return;
   }
   if (!name) {
-    showNotice(t(requestType === 'karaoke' ? 'notice.singerRequired' : 'notice.nameRequired'), 'error');
+    showNotice(t(submissionType === 'karaoke' ? 'notice.singerRequired' : 'notice.nameRequired'), 'error');
     requesterName.focus();
     return;
   }
@@ -448,7 +455,7 @@ form.addEventListener('submit', async event => {
   const { error } = await supabase.from('song_requests').insert({
     id: requestId,
     event_id: publicEvent.id,
-    request_type: requestType,
+    request_type: submissionType,
     artist,
     song,
     song_url: songUrl || null,
@@ -462,7 +469,7 @@ form.addEventListener('submit', async event => {
   });
 
   submitButton.disabled = false;
-  submitButton.textContent = t(requestType === 'karaoke' ? 'guest.submit.karaoke' : 'guest.submit.song');
+  submitButton.textContent = t(submissionType === 'karaoke' ? 'guest.submit.karaoke' : 'guest.submit.song');
 
   if (error) {
     console.error(error);
@@ -475,7 +482,7 @@ form.addEventListener('submit', async event => {
     artist,
     song,
     song_url: songUrl || null,
-    request_type: requestType,
+    request_type: submissionType,
     tip_amount: selectedTip || null,
     payment_method: selectedTip ? selectedPaymentMethod : null,
     payment_status: selectedTip ? 'pending' : 'not_required',
@@ -483,7 +490,7 @@ form.addEventListener('submit', async event => {
     etransfer_email: publicEvent?.etransfer_email || null,
   };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
-  if (requestType === 'karaoke') {
+  if (submissionType === 'karaoke') {
     pushRegisteredRequestId = null;
     localStorage.removeItem(`dropmysong_push_request_${eventSlug}`);
   }
@@ -499,7 +506,7 @@ form.addEventListener('submit', async event => {
   tipButtons.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
   paymentMethods.querySelectorAll('[data-payment-method]').forEach(item => item.classList.remove('active'));
   syncPaymentUi();
-  showNotice(t(requestType === 'karaoke' ? 'notice.karaokeSent' : 'notice.requestSent'), 'success');
+  showNotice(t(submissionType === 'karaoke' ? 'notice.karaokeSent' : 'notice.requestSent'), 'success');
   await refreshStatus();
   subscribeToRequestUpdates();
   startPolling();
