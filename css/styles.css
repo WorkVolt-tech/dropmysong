@@ -768,8 +768,51 @@ a.music-preview:hover {
 }
 .host-called-button { width: 100%; margin-top: 12px; }
 .host-request-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-.host-request-links a { text-align: center; text-decoration: none; }
+.host-request-links a,
+.host-request-links button { text-align: center; text-decoration: none; }
+.host-request-form-wrap {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(129,159,208,.18);
+}
+.host-request-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.host-request-frame {
+  width: 100%;
+  min-height: 980px;
+  border: 1px solid rgba(129,159,208,.2);
+  border-radius: 16px;
+  background: #030508;
+}
 .host-auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 8px; }
+
+body.embedded-host-request {
+  min-height: 0;
+  background: transparent;
+}
+body.embedded-host-request .guest-shell {
+  width: 100%;
+  max-width: none;
+  padding: 4px 4px 24px;
+}
+body.embedded-host-request .brand-header,
+body.embedded-host-request .request-mode-switch {
+  display: none;
+}
+body.embedded-host-request .event-banner {
+  margin-top: 0;
+}
+body.embedded-host-request .hero-copy {
+  padding: 18px 6px 12px;
+}
+body.embedded-host-request .hero-copy h1 {
+  font-size: clamp(1.55rem, 4vw, 2.15rem);
+}
 
 @media (max-width: 760px) {
   .host-access-form { grid-template-columns: 1fr; }
@@ -785,4 +828,6 @@ a.music-preview:hover {
   .host-grid { grid-template-columns: 1fr; }
   .host-submit-panel { grid-column: auto; }
   .host-request-links, .host-auth-actions { grid-template-columns: 1fr; }
+  .host-request-form-head { align-items: stretch; flex-direction: column; }
+  .host-request-frame { min-height: 1120px; }
 }
