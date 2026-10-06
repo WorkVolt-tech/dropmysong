@@ -214,6 +214,10 @@ async function loadRequests() {
     return;
   }
   requests = (data || []).map(row => ({ ...row, request_type: row.request_type || 'song' }));
+  if (currentTab === 'analytics' && analyticsEventId === activeEvent.id) {
+    analyticsRows = [...requests];
+    renderAnalytics();
+  }
   renderAll();
 }
 
@@ -260,6 +264,10 @@ function renderAll() {
   renderKaraokeSideRail();
   renderHistory();
   updateDashboardHeader();
+  if (currentTab === 'analytics') {
+    renderAnalyticsEventOptions();
+    loadAnalytics(analyticsEventSelect.value || analyticsEventId || activeEvent?.id || events[0]?.id || null);
+  }
 }
 
 function filterRows(rows, query, filter) {
@@ -899,6 +907,337 @@ function renderEvents() {
   eventsList.querySelectorAll('[data-archive-event]').forEach(button => button.addEventListener('click', () => archiveEvent(button.dataset.archiveEvent)));
 }
 
+async function archiveEvent(id) {
+  if (!archiveSupported) {
+    showDashboardNotice(t('analytics.archiveSetupRequired'), 'error');
+    return;
+  }
+
+  const event = events.find(item => item.id === id);
+  if (!event) return;
+  if (!window.confirm(t('analytics.archiveConfirm', { name: event.name }))) return;
+
+  const { error } = await supabase.from('events').update({
+    archived_at: new Date().toISOString(),
+    is_active: false,
+    requests_enabled: false,
+    karaoke_enabled: false,
+  }).eq('id', id);
+
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+
+  showDashboardNotice(t('analytics.eventArchived'), 'success');
+  if (analyticsEventId === id) analyticsRows = [];
+  await loadEvents();
+  if (currentTab === 'analytics') await loadAnalytics();
+}
+
+async function restoreArchivedEvent(id) {
+  if (!archiveSupported) return;
+  const { error } = await supabase.from('events').update({
+    archived_at: null,
+  }).eq('id', id);
+
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+
+  showDashboardNotice(t('analytics.eventRestored'), 'success');
+  await loadEvents(id);
+  setTab('events');
+}
+
+function renderAnalyticsEventOptions() {
+  if (!analyticsEventSelect) return;
+
+  if (!events.length) {
+    analyticsEventSelect.innerHTML = '';
+    analyticsEventId = null;
+    return;
+  }
+
+  if (!analyticsEventId || !events.some(event => event.id === analyticsEventId)) {
+    analyticsEventId = activeEvent?.id || events[0]?.id || null;
+  }
+
+  const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
+  analyticsEventSelect.innerHTML = events.map(event => {
+    const date = event.event_date
+      ? new Date(event.event_date + 'T00:00:00').toLocaleDateString(locale)
+      : t('dashboard.noDate');
+    const archived = event.archived_at ? ` · ${t('analytics.archived')}` : '';
+    return `<option value="${event.id}">${escapeHtml(event.name)} · ${escapeHtml(date)}${escapeHtml(archived)}</option>`;
+  }).join('');
+
+  if (analyticsEventId) analyticsEventSelect.value = analyticsEventId;
+}
+
+async function loadAnalytics(eventId = null) {
+  if (!analyticsEventSelect) return;
+
+  const targetId = eventId || analyticsEventSelect.value || analyticsEventId || activeEvent?.id || events[0]?.id || null;
+  analyticsEventId = targetId;
+
+  if (!targetId) {
+    analyticsRows = [];
+    renderAnalytics();
+    return;
+  }
+
+  analyticsEventSelect.value = targetId;
+  exportAnalyticsCsv.disabled = true;
+
+  const { data, error } = await supabase
+    .from('song_requests')
+    .select('id,event_id,request_type,artist,song,requester_name,status,tip_amount,payment_status,created_at,updated_at,played_at')
+    .eq('event_id', targetId)
+    .order('created_at', { ascending: true });
+
+  exportAnalyticsCsv.disabled = false;
+
+  if (error) {
+    analyticsRows = [];
+    showDashboardNotice(error.message, 'error');
+    renderAnalytics();
+    return;
+  }
+
+  analyticsRows = (data || []).map(row => ({ ...row, request_type: row.request_type || 'song' }));
+  renderAnalytics();
+  updateDashboardHeader();
+}
+
+function money(amount) {
+  const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'CAD',
+    minimumFractionDigits: 2,
+  }).format(Number(amount || 0));
+}
+
+function groupAnalytics(rows, keyFn) {
+  const map = new Map();
+  rows.forEach(row => {
+    const rawKey = keyFn(row);
+    if (!rawKey) return;
+    const key = rawKey.toLowerCase();
+    const existing = map.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.rows.push(row);
+    } else {
+      map.set(key, { key: rawKey, count: 1, rows: [row] });
+    }
+  });
+  return [...map.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+}
+
+function renderAnalytics() {
+  if (!analyticsContent || !analyticsEmpty) return;
+
+  const event = events.find(item => item.id === analyticsEventId) || null;
+  analyticsEmpty.classList.toggle('hidden', !!event);
+  analyticsContent.classList.toggle('hidden', !event);
+  exportAnalyticsCsv.disabled = !event || !analyticsRows.some(row => row.status === 'played');
+
+  if (!event) {
+    archivedEventCount.textContent = events.filter(item => item.archived_at).length;
+    renderArchivedEvents();
+    return;
+  }
+
+  const rows = analyticsRows;
+  const songs = rows.filter(row => row.request_type !== 'karaoke');
+  const karaoke = rows.filter(row => row.request_type === 'karaoke');
+  const played = rows.filter(row => row.status === 'played');
+  const rejected = rows.filter(row => row.status === 'rejected');
+  const cantFind = rows.filter(row => row.status === 'cant_find');
+  const confirmedTips = rows
+    .filter(row => row.payment_status === 'confirmed')
+    .reduce((sum, row) => sum + Number(row.tip_amount || 0), 0);
+  const pendingTips = rows
+    .filter(row => row.payment_status === 'pending')
+    .reduce((sum, row) => sum + Number(row.tip_amount || 0), 0);
+  const completion = rows.length ? Math.round((played.length / rows.length) * 100) : 0;
+
+  analyticsTotalRequests.textContent = rows.length;
+  analyticsTotalBreakdown.textContent = t('analytics.songKaraokeBreakdown', { songs: songs.length, karaoke: karaoke.length });
+  analyticsPlayed.textContent = played.length;
+  analyticsCompletionRate.textContent = t('analytics.completionRate', { rate: completion });
+  analyticsConfirmedTips.textContent = money(confirmedTips);
+  analyticsPendingTips.textContent = t('analytics.pendingTips', { amount: money(pendingTips) });
+  analyticsRejected.textContent = rejected.length + cantFind.length;
+  analyticsRejectedBreakdown.textContent = t('analytics.rejectedBreakdown', { rejected: rejected.length, cantFind: cantFind.length });
+
+  const tracks = groupAnalytics(rows, row => `${row.artist || ''} — ${row.song || ''}`).slice(0, 6);
+  analyticsTrackCount.textContent = new Set(rows.map(row => `${row.artist || ''}|${row.song || ''}`.toLowerCase())).size;
+  analyticsTopTracks.innerHTML = tracks.length
+    ? tracks.map((item, index) => {
+        const row = item.rows[0];
+        const type = item.rows.some(track => track.request_type === 'karaoke') && item.rows.some(track => track.request_type !== 'karaoke')
+          ? t('analytics.mixed')
+          : row.request_type === 'karaoke' ? t('host.karaoke') : t('host.song');
+        return `
+          <div class="analytics-rank-item">
+            <span class="analytics-rank-number">${index + 1}</span>
+            <div>
+              <strong>${escapeHtml(row.song)}</strong>
+              <small>${escapeHtml(row.artist)} · ${escapeHtml(type)}</small>
+            </div>
+            <span class="analytics-rank-count">×${item.count}</span>
+          </div>`;
+      }).join('')
+    : `<div class="empty-state compact">${escapeHtml(t('analytics.noRequests'))}</div>`;
+
+  const artists = groupAnalytics(rows, row => row.artist || '').slice(0, 6);
+  analyticsArtistCount.textContent = artists.length;
+  analyticsTopArtists.innerHTML = artists.length
+    ? artists.map((item, index) => `
+        <div class="analytics-rank-item">
+          <span class="analytics-rank-number">${index + 1}</span>
+          <div><strong>${escapeHtml(item.key)}</strong><small>${escapeHtml(t('analytics.requestsCount', { count: item.count }))}</small></div>
+          <span class="analytics-rank-count">×${item.count}</span>
+        </div>`).join('')
+    : `<div class="empty-state compact">${escapeHtml(t('analytics.noRequests'))}</div>`;
+
+  const statuses = ['played', 'playing', 'accepted', 'pending', 'cant_find', 'rejected'];
+  analyticsStatusMix.innerHTML = statuses.map(status => {
+    const count = rows.filter(row => row.status === status).length;
+    const percent = rows.length ? Math.round((count / rows.length) * 100) : 0;
+    return `
+      <div class="analytics-status-row">
+        <div><strong>${escapeHtml(t(`status.${status}`))}</strong><span>${count}</span></div>
+        <div class="analytics-status-track"><i class="status-${status}" style="width:${percent}%"></i></div>
+      </div>`;
+  }).join('');
+
+  const recent = played
+    .slice()
+    .sort((a, b) => new Date(b.played_at || b.updated_at) - new Date(a.played_at || a.updated_at))
+    .slice(0, 8);
+
+  analyticsRecentPlayed.innerHTML = recent.length
+    ? recent.map((row, index) => `
+        <div class="analytics-rank-item">
+          <span class="analytics-rank-number">✓</span>
+          <div>
+            <strong>${escapeHtml(row.song)}</strong>
+            <small>${escapeHtml(row.artist)} · ${escapeHtml(row.request_type === 'karaoke' ? t('host.karaoke') : t('host.song'))}</small>
+          </div>
+          <span class="analytics-played-time">${escapeHtml(relativeTime(row.played_at || row.updated_at, getLanguage()))}</span>
+        </div>`).join('')
+    : `<div class="empty-state compact">${escapeHtml(t('analytics.nonePlayed'))}</div>`;
+
+  renderArchivedEvents();
+}
+
+function renderArchivedEvents() {
+  if (!archivedEventsList) return;
+
+  if (!archiveSupported) {
+    archivedEventCount.textContent = '—';
+    archivedEventsList.innerHTML = `<div class="empty-state">${escapeHtml(t('analytics.archiveSetupRequired'))}</div>`;
+    return;
+  }
+
+  const archived = events
+    .filter(event => event.archived_at)
+    .sort((a, b) => new Date(b.archived_at) - new Date(a.archived_at));
+
+  archivedEventCount.textContent = archived.length;
+
+  if (!archived.length) {
+    archivedEventsList.innerHTML = `<div class="empty-state compact">${escapeHtml(t('analytics.noArchivedEvents'))}</div>`;
+    return;
+  }
+
+  const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
+  archivedEventsList.innerHTML = archived.map(event => {
+    const eventDate = event.event_date
+      ? new Date(event.event_date + 'T00:00:00').toLocaleDateString(locale)
+      : t('dashboard.noDate');
+    const archivedDate = new Date(event.archived_at).toLocaleDateString(locale);
+    return `
+      <article class="archive-item">
+        <div>
+          <strong>${escapeHtml(event.name)}</strong>
+          <small>${escapeHtml(eventDate)} · ${escapeHtml(t('analytics.archivedOn', { date: archivedDate }))}</small>
+        </div>
+        <div class="archive-actions">
+          <button class="secondary-button" type="button" data-analytics-event="${event.id}">${escapeHtml(t('analytics.viewAnalytics'))}</button>
+          <button class="ghost-button" type="button" data-restore-event="${event.id}">${escapeHtml(t('analytics.restoreEvent'))}</button>
+        </div>
+      </article>`;
+  }).join('');
+
+  archivedEventsList.querySelectorAll('[data-analytics-event]').forEach(button => {
+    button.addEventListener('click', async () => {
+      analyticsEventId = button.dataset.analyticsEvent;
+      renderAnalyticsEventOptions();
+      await loadAnalytics(analyticsEventId);
+      document.querySelector('#analyticsTab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  archivedEventsList.querySelectorAll('[data-restore-event]').forEach(button => {
+    button.addEventListener('click', () => restoreArchivedEvent(button.dataset.restoreEvent));
+  });
+}
+
+analyticsEventSelect.addEventListener('change', () => {
+  analyticsEventId = analyticsEventSelect.value || null;
+  loadAnalytics(analyticsEventId);
+});
+
+function csvCell(value) {
+  const text = value == null ? '' : String(value);
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+exportAnalyticsCsv.addEventListener('click', () => {
+  const event = events.find(item => item.id === analyticsEventId);
+  if (!event) return;
+
+  const playedRows = analyticsRows
+    .filter(row => row.status === 'played')
+    .slice()
+    .sort((a, b) => new Date(a.played_at || a.updated_at) - new Date(b.played_at || b.updated_at));
+
+  if (!playedRows.length) {
+    showDashboardNotice(t('analytics.nonePlayed'), 'error');
+    return;
+  }
+
+  const header = ['#', 'Type', 'Artist', 'Song', 'Requested By', 'Played At', 'Tip', 'Payment Status'];
+  const body = playedRows.map((row, index) => [
+    index + 1,
+    row.request_type === 'karaoke' ? 'Karaoke' : 'Song',
+    row.artist,
+    row.song,
+    row.requester_name || '',
+    row.played_at || row.updated_at || '',
+    Number(row.tip_amount || 0).toFixed(2),
+    row.payment_status || '',
+  ]);
+
+  const csv = [header, ...body].map(row => row.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${event.slug || slugify(event.name) || 'drop-my-song-event'}-played.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showDashboardNotice(t('analytics.exported'), 'success');
+});
+
 async function makeEventActive(id) {
   const { error: clearError } = await supabase.from('events').update({ is_active: false }).neq('id', id);
   if (clearError) return showDashboardNotice(clearError.message, 'error');
@@ -908,7 +1247,7 @@ async function makeEventActive(id) {
 }
 
 function setTab(tab) {
-  currentTab = ['queue', 'karaoke', 'played', 'events'].includes(tab) ? tab : 'queue';
+  currentTab = ['queue', 'karaoke', 'played', 'analytics', 'events'].includes(tab) ? tab : 'queue';
   document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.tab === currentTab));
   document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
   document.querySelector(`#${currentTab}Tab`)?.classList.remove('hidden');
@@ -924,6 +1263,7 @@ function updateDashboardHeader() {
     queue: t('dashboard.songRequests'),
     karaoke: t('dashboard.karaokeRequests'),
     played: t('dashboard.playedTitle'),
+    analytics: t('analytics.title'),
     events: t('dashboard.eventsTitle'),
   };
   dashboardTitle.textContent = titles[currentTab];
@@ -933,7 +1273,9 @@ function updateDashboardHeader() {
       ? activeCount(karaokeRequests())
       : currentTab === 'played'
         ? songRequests().filter(row => row.status === 'played').length + karaokeRequests().filter(row => row.status === 'played').length
-        : events.length;
+        : currentTab === 'analytics'
+          ? analyticsRows.length
+          : events.filter(event => !event.archived_at).length;
   requestCount.textContent = count;
 }
 
@@ -996,6 +1338,9 @@ copyQrModalLink.addEventListener('click', async () => {
 window.addEventListener('dropmysong:languagechange', () => {
   applyTranslations();
   renderEvents();
+  renderAnalyticsEventOptions();
+  renderArchivedEvents();
+  renderAnalytics();
   renderAll();
   syncPaymentSettingsForm();
   syncHostAccessPanel();
