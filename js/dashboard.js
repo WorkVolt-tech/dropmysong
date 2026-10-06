@@ -868,8 +868,7 @@ async function createHostQrInvite() {
   const { error: deleteError } = await supabase
     .from('host_invites')
     .delete()
-    .eq('event_id', activeEvent.id)
-    .is('claimed_at', null);
+    .eq('event_id', activeEvent.id);
 
   if (deleteError) {
     generateHostQr.disabled = false;
