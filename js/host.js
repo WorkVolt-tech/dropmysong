@@ -31,6 +31,9 @@ const requestFormWrap = document.querySelector('#hostRequestFormWrap');
 const requestFrame = document.querySelector('#hostRequestFrame');
 const requestFormTitle = document.querySelector('#hostRequestFormTitle');
 const closeRequestFormButton = document.querySelector('#hostCloseRequestForm');
+const hostEventQr = document.querySelector('#hostEventQr');
+const hostEventGuestLink = document.querySelector('#hostEventGuestLink');
+const copyHostEventLink = document.querySelector('#copyHostEventLink');
 
 const inviteToken = new URLSearchParams(location.search).get('invite');
 const qrNameStorageKey = inviteToken ? `dropmysong_qr_host_name_${inviteToken.slice(-16)}` : null;
@@ -144,6 +147,7 @@ async function enterQrDashboard(name) {
   logoutButton.textContent = t('host.leaveAccess');
   identity.textContent = t('host.qrIdentity', { name });
   eventName.textContent = activeAssignment.event_name;
+  renderHostEventShare();
   const ok = await loadQrQueue(true);
   if (!ok) return;
   startQrPolling();
@@ -267,6 +271,7 @@ async function loadAssignments() {
     queueCount.textContent = '0';
     requestFormWrap.classList.add('hidden');
     requestFrame.removeAttribute('src');
+    clearHostEventShare();
     teardownRealtime();
     return;
   }
@@ -285,6 +290,59 @@ eventSelect.addEventListener('change', () => {
   requestFormWrap.classList.add('hidden');
   requestFrame.removeAttribute('src');
   activateAssignment(eventSelect.value);
+});
+
+function clearHostEventShare() {
+  if (hostEventQr) hostEventQr.innerHTML = '';
+  if (hostEventGuestLink) hostEventGuestLink.textContent = '';
+  if (copyHostEventLink) copyHostEventLink.disabled = true;
+}
+
+function renderHostEventShare() {
+  if (!activeAssignment?.event_slug) {
+    clearHostEventShare();
+    return;
+  }
+
+  const url = buildGuestUrl(activeAssignment.event_slug);
+  hostEventGuestLink.textContent = url;
+  copyHostEventLink.disabled = false;
+  hostEventQr.innerHTML = '';
+
+  if (window.QRCode) {
+    new window.QRCode(hostEventQr, {
+      text: url,
+      width: 180,
+      height: 180,
+      colorDark: '#05070b',
+      colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.M,
+    });
+  } else {
+    hostEventQr.innerHTML = `<div class="empty-state">${escapeHtml(url)}</div>`;
+  }
+}
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const area = document.createElement('textarea');
+  area.value = value;
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  document.execCommand('copy');
+  area.remove();
+}
+
+copyHostEventLink.addEventListener('click', async () => {
+  const value = hostEventGuestLink.textContent.trim();
+  if (!value) return;
+  await copyText(value);
+  showHostNotice(t('host.guestLinkCopied'), 'success');
 });
 
 function embeddedRequestUrl(type) {
@@ -318,6 +376,7 @@ async function activateAssignment(assignmentId) {
   activeAssignment = assignments.find(item => item.id === assignmentId) || null;
   if (!activeAssignment) return;
   eventName.textContent = activeAssignment.event_name;
+  renderHostEventShare();
   await Promise.all([loadRequests(), loadHostCalls()]);
   seedReadyAnnouncements();
   subscribeRealtime();
@@ -552,6 +611,7 @@ window.addEventListener('dropmysong:languagechange', () => {
   if (activeAssignment) {
     eventName.textContent = activeAssignment.event_name;
     renderHostQueues();
+    renderHostEventShare();
   }
 });
 
