@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient.js';
 import { escapeHtml, getOrCreateGuestToken, isHttpUrl } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 import { getLinkPreview, renderLinkPreviewInto } from './linkPreview.js';
-import { ETRANSFER_EMAIL, PAYPAL_ME_URL, VAPID_PUBLIC_KEY } from './config.js';
+import { ETRANSFER_EMAIL, PAYPAL_ME_URL, SUPABASE_ANON_KEY, SUPABASE_URL, VAPID_PUBLIC_KEY } from './config.js';
 
 const params = new URLSearchParams(location.search);
 const eventSlug = params.get('event');
@@ -75,6 +75,7 @@ let availableTipOptions = [2, 5, 10, 20];
 let recentPlayedRows = [];
 let recentPlayedAvailable = false;
 let recentPlayedTimer = null;
+let paypalCheckoutBusy = false;
 let pushRegisteredRequestId = localStorage.getItem(`dropmysong_push_request_${eventSlug}`) || null;
 
 function mayReplaceAutoFilled(input, lastAutoValue) {
@@ -225,12 +226,124 @@ function syncPaymentUi() {
   etransferFields.classList.toggle('hidden', selectedMethod !== 'etransfer');
 }
 
-function paypalUrlForAmount(amount) {
-  const raw = `${publicEvent?.paypal_me_url || ''}`.trim();
-  if (!raw || !amount) return '';
-  const base = raw.replace(/\/+$/, '');
-  return `${base}/${encodeURIComponent(Number(amount).toFixed(2))}CAD`;
+async function paypalApi(payload) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/paypal-payment`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const raw = await response.text();
+  let data = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+
+  if (!response.ok || data?.error) {
+    throw new Error(data?.error || raw || t('guest.paypalAutomaticFailed'));
+  }
+
+  return data;
 }
+
+function cleanPayPalReturnUrl() {
+  const url = new URL(location.href);
+  ['paypal', 'request', 'token', 'PayerID'].forEach(name => url.searchParams.delete(name));
+  history.replaceState({}, '', url);
+}
+
+async function startPayPalCheckout() {
+  if (!currentRequest?.id || currentRequest.payment_method !== 'paypal' || currentRequest.payment_status === 'confirmed') return;
+
+  paypalCheckoutBusy = true;
+  renderPaymentStatus();
+  clearNotice();
+
+  try {
+    const data = await paypalApi({
+      action: 'create',
+      request_id: currentRequest.id,
+      guest_token: guestToken,
+      language: getLanguage(),
+    });
+
+    if (data?.confirmed) {
+      currentRequest.payment_status = 'confirmed';
+      renderPaymentStatus();
+      await refreshStatus();
+      showNotice(t('guest.paypalConfirmedNotice'), 'success');
+      return;
+    }
+
+    if (!data?.approve_url) throw new Error(t('guest.paypalAutomaticFailed'));
+    location.assign(data.approve_url);
+  } catch (error) {
+    paypalCheckoutBusy = false;
+    renderPaymentStatus();
+    showNotice(error?.message || t('guest.paypalAutomaticFailed'), 'error');
+  }
+}
+
+async function handlePayPalReturn() {
+  const mode = params.get('paypal');
+  if (!mode) return;
+
+  if (mode === 'cancel') {
+    showNotice(t('guest.paypalCancelled'));
+    cleanPayPalReturnUrl();
+    return;
+  }
+
+  if (mode !== 'return') return;
+
+  const requestId = params.get('request');
+  const orderId = params.get('token');
+  if (!requestId || !orderId) {
+    showNotice(t('guest.paypalAutomaticFailed'), 'error');
+    cleanPayPalReturnUrl();
+    return;
+  }
+
+  if (!currentRequest || currentRequest.id !== requestId) {
+    currentRequest = {
+      id: requestId,
+      request_type: requestType,
+      payment_method: 'paypal',
+      payment_status: 'pending',
+    };
+  }
+
+  paypalCheckoutBusy = true;
+  showNotice(t('guest.paypalProcessing'));
+
+  try {
+    const data = await paypalApi({
+      action: 'capture',
+      request_id: requestId,
+      order_id: orderId,
+      guest_token: guestToken,
+      language: getLanguage(),
+    });
+
+    if (!data?.confirmed) throw new Error(t('guest.paypalAutomaticFailed'));
+    currentRequest.payment_status = 'confirmed';
+    await refreshStatus();
+    showNotice(t('guest.paypalConfirmedNotice'), 'success');
+  } catch (error) {
+    showNotice(error?.message || t('guest.paypalAutomaticFailed'), 'error');
+  } finally {
+    paypalCheckoutBusy = false;
+    cleanPayPalReturnUrl();
+    renderPaymentStatus();
+  }
+}
+
+paypalPayButton.addEventListener('click', event => {
+  event.preventDefault();
+  startPayPalCheckout();
+});
 
 function renderPaymentStatus() {
   if (!currentRequest?.tip_amount) {
@@ -260,9 +373,10 @@ function renderPaymentStatus() {
     paypalPayButton.classList.add('hidden');
   } else if (currentRequest.payment_method === 'paypal') {
     paymentStatusText.textContent = t('guest.paypalPendingCopy');
-    const url = paypalUrlForAmount(currentRequest.tip_amount);
-    paypalPayButton.href = url || '#';
-    paypalPayButton.classList.toggle('hidden', !url);
+    paypalPayButton.removeAttribute('href');
+    paypalPayButton.classList.remove('hidden');
+    paypalPayButton.setAttribute('aria-disabled', paypalCheckoutBusy ? 'true' : 'false');
+    paypalPayButton.textContent = t(paypalCheckoutBusy ? 'guest.openingPaypal' : 'guest.payWithPaypal');
   } else {
     paymentStatusText.textContent = t('guest.paymentPendingCopy');
     paypalPayButton.classList.add('hidden');
@@ -354,6 +468,7 @@ async function loadEvent() {
   await loadRecentPlayed();
   startRecentPlayedPolling();
   restoreLastRequest();
+  await handlePayPalReturn();
 }
 
 function renderEventBanner() {
