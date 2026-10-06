@@ -67,6 +67,7 @@ async function hostQrApi(action, extra = {}) {
       headers: {
         'Content-Type': 'application/json',
         apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
       },
       body: JSON.stringify({ token: inviteToken, action, ...extra }),
     });
@@ -75,16 +76,18 @@ async function hostQrApi(action, extra = {}) {
     throw new Error(t('host.functionUnreachable'));
   }
 
+  const raw = await response.text();
   let data = null;
   try {
-    data = await response.json();
+    data = raw ? JSON.parse(raw) : null;
   } catch {
     data = null;
   }
 
   if (!response.ok || data?.error) {
-    console.error('Host QR function error', response.status, data);
-    throw new Error(data?.error || t('host.functionFailed', { status: response.status }));
+    console.error('Host QR function error', response.status, data || raw);
+    const detail = data?.error || raw || t('host.functionFailed', { status: response.status });
+    throw new Error(detail);
   }
 
   return data;
