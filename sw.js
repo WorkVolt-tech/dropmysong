@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v17-public-history-host-share-responsive';
+const CACHE = 'dropmysong-v18-neon-redesign';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './host.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/register-sw.js',
