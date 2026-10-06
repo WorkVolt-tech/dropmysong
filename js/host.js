@@ -9,6 +9,7 @@ const loginEmail = document.querySelector('#hostLoginEmail');
 const loginPassword = document.querySelector('#hostLoginPassword');
 const createAccountButton = document.querySelector('#hostCreateAccount');
 const loginNotice = document.querySelector('#hostLoginNotice');
+const loginCopy = document.querySelector('#hostLoginCopy');
 const hostNotice = document.querySelector('#hostNotice');
 const logoutButton = document.querySelector('#hostLogout');
 const enableAlertsButton = document.querySelector('#hostEnableAlerts');
@@ -31,8 +32,10 @@ let realtimeChannel = null;
 let announcedReady = new Set();
 let noticeTimer = null;
 let audioContext = null;
+const inviteToken = new URLSearchParams(location.search).get('invite');
 
 initI18n();
+if (inviteToken && loginCopy) loginCopy.textContent = t('host.inviteLoginCopy');
 
 function showLoginNotice(message, type = 'error') {
   loginNotice.textContent = message;
@@ -66,7 +69,11 @@ createAccountButton.addEventListener('click', async () => {
     return showLoginNotice(t('host.accountFieldsRequired'));
   }
   createAccountButton.disabled = true;
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo: location.href },
+  });
   createAccountButton.disabled = false;
   if (error) return showLoginNotice(error.message);
   if (data.session) {
@@ -83,11 +90,32 @@ logoutButton.addEventListener('click', async () => {
   location.reload();
 });
 
+async function claimInviteIfPresent() {
+  if (!inviteToken || !session) return true;
+
+  showLoginNotice(t('host.inviteClaiming'), 'success');
+  const { data, error } = await supabase.functions.invoke('claim-host-invite', {
+    body: { token: inviteToken },
+  });
+
+  if (error || data?.error) {
+    showLoginNotice(data?.error || error?.message || t('host.inviteClaimFailed'), 'error');
+    return false;
+  }
+
+  const cleanUrl = new URL(location.href);
+  cleanUrl.searchParams.delete('invite');
+  history.replaceState({}, '', cleanUrl);
+  return true;
+}
+
 async function enterHostDashboard() {
+  if (!(await claimInviteIfPresent())) return;
   loginView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
   identity.textContent = session?.user?.email || '';
   await loadAssignments();
+  if (inviteToken) showHostNotice(t('host.inviteClaimed'), 'success');
 }
 
 async function loadAssignments() {
@@ -343,6 +371,7 @@ async function announceReady(row) {
 
 window.addEventListener('dropmysong:languagechange', () => {
   applyTranslations();
+  if (inviteToken && loginCopy && !loginView.classList.contains('hidden')) loginCopy.textContent = t('host.inviteLoginCopy');
   if (activeAssignment) {
     eventName.textContent = activeAssignment.event_name;
     renderHostQueues();
