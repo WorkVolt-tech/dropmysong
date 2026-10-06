@@ -61,6 +61,26 @@ const qrModalCode = document.querySelector('#qrModalCode');
 const qrModalLink = document.querySelector('#qrModalLink');
 const qrInactiveWarning = document.querySelector('#qrInactiveWarning');
 const copyQrModalLink = document.querySelector('#copyQrModalLink');
+const analyticsEventSelect = document.querySelector('#analyticsEventSelect');
+const exportAnalyticsCsv = document.querySelector('#exportAnalyticsCsv');
+const analyticsEmpty = document.querySelector('#analyticsEmpty');
+const analyticsContent = document.querySelector('#analyticsContent');
+const analyticsTotalRequests = document.querySelector('#analyticsTotalRequests');
+const analyticsTotalBreakdown = document.querySelector('#analyticsTotalBreakdown');
+const analyticsPlayed = document.querySelector('#analyticsPlayed');
+const analyticsCompletionRate = document.querySelector('#analyticsCompletionRate');
+const analyticsConfirmedTips = document.querySelector('#analyticsConfirmedTips');
+const analyticsPendingTips = document.querySelector('#analyticsPendingTips');
+const analyticsRejected = document.querySelector('#analyticsRejected');
+const analyticsRejectedBreakdown = document.querySelector('#analyticsRejectedBreakdown');
+const analyticsTrackCount = document.querySelector('#analyticsTrackCount');
+const analyticsTopTracks = document.querySelector('#analyticsTopTracks');
+const analyticsArtistCount = document.querySelector('#analyticsArtistCount');
+const analyticsTopArtists = document.querySelector('#analyticsTopArtists');
+const analyticsStatusMix = document.querySelector('#analyticsStatusMix');
+const analyticsRecentPlayed = document.querySelector('#analyticsRecentPlayed');
+const archivedEventCount = document.querySelector('#archivedEventCount');
+const archivedEventsList = document.querySelector('#archivedEventsList');
 
 let session = null;
 let events = [];
@@ -73,6 +93,9 @@ let noticeTimer = null;
 let hostInviteUrl = '';
 let hostInviteEventId = null;
 let queueReorderInProgress = false;
+let analyticsEventId = null;
+let analyticsRows = [];
+let archiveSupported = true;
 
 initI18n();
 
