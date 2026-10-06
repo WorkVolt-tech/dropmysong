@@ -1,22 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.76.1';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-function getDefaultKey(jsonName: string, legacyName: string) {
-  const legacy = Deno.env.get(legacyName);
-  if (legacy) return legacy;
-  const raw = Deno.env.get(jsonName);
-  if (!raw) return '';
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed.default || Object.values(parsed)[0] || '';
-  } catch {
-    return '';
-  }
-}
+import { withSupabase } from 'npm:@supabase/server@1';
 
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -24,23 +6,12 @@ async function sha256Hex(value: string) {
 }
 
 function json(body: unknown, status = 200) {
-  return Response.json(body, {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return Response.json(body, { status });
 }
 
 export default {
-  async fetch(req: Request) {
-    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  fetch: withSupabase({ auth: 'none' }, async (req, ctx) => {
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const secretKey = getDefaultKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !secretKey) {
-      return json({ error: 'Host QR service is not configured' }, 500);
-    }
 
     let body: {
       token?: string;
@@ -62,11 +33,9 @@ export default {
       return json({ error: 'Invalid host invite' }, 400);
     }
 
-    const admin = createClient(supabaseUrl, secretKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
+    const admin = ctx.supabaseAdmin;
     const tokenHash = await sha256Hex(token);
+
     const { data: invite, error: inviteError } = await admin
       .from('host_invites')
       .select('id,event_id,event_name,event_slug,expires_at')
@@ -162,6 +131,7 @@ export default {
           .select('request_id,called_at,host_email')
           .eq('request_id', requestId)
           .maybeSingle();
+
         return json({ called: true, call: duplicate || null });
       }
 
@@ -169,5 +139,5 @@ export default {
     }
 
     return json({ error: 'Unknown action' }, 400);
-  },
+  }),
 };
