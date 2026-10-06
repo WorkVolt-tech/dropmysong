@@ -1,4 +1,25 @@
-import { withSupabase } from 'npm:@supabase/server@1';
+import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+function getDefaultKey(jsonName: string, legacyName: string) {
+  const legacy = Deno.env.get(legacyName);
+  if (legacy) return legacy;
+
+  const raw = Deno.env.get(jsonName);
+  if (!raw) return '';
+
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.default || Object.values(parsed)[0] || '';
+  } catch {
+    return '';
+  }
+}
 
 async function sha256Hex(value: string) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -6,12 +27,28 @@ async function sha256Hex(value: string) {
 }
 
 function json(body: unknown, status = 200) {
-  return Response.json(body, { status });
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
 export default {
-  fetch: withSupabase({ auth: 'none' }, async (req, ctx) => {
-    if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+  async fetch(req: Request) {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
+    if (req.method !== 'POST') {
+      return json({ error: 'Method not allowed' }, 405);
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const serviceRoleKey = getDefaultKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return json({ error: 'Host QR service is missing its Supabase service key' }, 500);
+    }
 
     let body: {
       token?: string;
@@ -33,7 +70,13 @@ export default {
       return json({ error: 'Invalid host invite' }, 400);
     }
 
-    const admin = ctx.supabaseAdmin;
+    const admin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
     const tokenHash = await sha256Hex(token);
 
     const { data: invite, error: inviteError } = await admin
@@ -103,12 +146,13 @@ export default {
       if (requestError) return json({ error: requestError.message }, 500);
       if (!requestRow) return json({ error: 'Request not found for this event' }, 404);
 
-      const { data: existing } = await admin
+      const { data: existing, error: existingError } = await admin
         .from('host_calls')
         .select('request_id,called_at,host_email')
         .eq('request_id', requestId)
         .maybeSingle();
 
+      if (existingError) return json({ error: existingError.message }, 500);
       if (existing) return json({ called: true, call: existing });
 
       const { data: call, error: callError } = await admin
@@ -126,12 +170,13 @@ export default {
       }
 
       if (!call && callError?.code === '23505') {
-        const { data: duplicate } = await admin
+        const { data: duplicate, error: duplicateError } = await admin
           .from('host_calls')
           .select('request_id,called_at,host_email')
           .eq('request_id', requestId)
           .maybeSingle();
 
+        if (duplicateError) return json({ error: duplicateError.message }, 500);
         return json({ called: true, call: duplicate || null });
       }
 
@@ -139,5 +184,5 @@ export default {
     }
 
     return json({ error: 'Unknown action' }, 400);
-  }),
+  },
 };
