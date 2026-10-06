@@ -867,7 +867,7 @@ eventForm.addEventListener('submit', async event => {
     requests_enabled: true,
     karaoke_enabled: true,
     tips_enabled: false,
-    is_active: events.length === 0,
+    is_active: events.filter(item => !item.archived_at).length === 0,
   }).select('id').single();
 
   if (error) return showDashboardNotice(error.message, 'error');
@@ -928,6 +928,9 @@ async function archiveEvent(id) {
     showDashboardNotice(error.message, 'error');
     return;
   }
+
+  // Revoke any still-valid host QR for an archived event.
+  await supabase.from('host_invites').delete().eq('event_id', id);
 
   showDashboardNotice(t('analytics.eventArchived'), 'success');
   if (analyticsEventId === id) analyticsRows = [];
@@ -1095,7 +1098,7 @@ function renderAnalytics() {
     : `<div class="empty-state compact">${escapeHtml(t('analytics.noRequests'))}</div>`;
 
   const artists = groupAnalytics(rows, row => row.artist || '').slice(0, 6);
-  analyticsArtistCount.textContent = artists.length;
+  analyticsArtistCount.textContent = new Set(rows.map(row => String(row.artist || '').trim().toLowerCase()).filter(Boolean)).size;
   analyticsTopArtists.innerHTML = artists.length
     ? artists.map((item, index) => `
         <div class="analytics-rank-item">
