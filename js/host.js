@@ -5,6 +5,9 @@ import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 const loginView = document.querySelector('#hostLoginView');
 const dashboardView = document.querySelector('#hostDashboardView');
 const loginForm = document.querySelector('#hostLoginForm');
+const qrJoinForm = document.querySelector('#hostQrJoinForm');
+const qrHostNameInput = document.querySelector('#hostQrName');
+const qrEventName = document.querySelector('#hostQrEventName');
 const loginEmail = document.querySelector('#hostLoginEmail');
 const loginPassword = document.querySelector('#hostLoginPassword');
 const createAccountButton = document.querySelector('#hostCreateAccount');
@@ -15,6 +18,7 @@ const logoutButton = document.querySelector('#hostLogout');
 const enableAlertsButton = document.querySelector('#hostEnableAlerts');
 const identity = document.querySelector('#hostIdentity');
 const eventSelect = document.querySelector('#hostEventSelect');
+const eventSelectLabel = eventSelect?.closest('label');
 const eventName = document.querySelector('#hostEventName');
 const readyList = document.querySelector('#hostReadyList');
 const queueList = document.querySelector('#hostQueueList');
@@ -23,23 +27,27 @@ const queueCount = document.querySelector('#hostQueueCount');
 const songRequestLink = document.querySelector('#hostSongRequestLink');
 const karaokeRequestLink = document.querySelector('#hostKaraokeRequestLink');
 
+const inviteToken = new URLSearchParams(location.search).get('invite');
+const qrNameStorageKey = inviteToken ? `dropmysong_qr_host_name_${inviteToken.slice(-16)}` : null;
+
 let session = null;
 let assignments = [];
 let activeAssignment = null;
 let requests = [];
 let hostCalls = new Map();
 let realtimeChannel = null;
+let qrPollTimer = null;
+let qrHostName = '';
 let announcedReady = new Set();
 let noticeTimer = null;
 let audioContext = null;
-const inviteToken = new URLSearchParams(location.search).get('invite');
 
 initI18n();
-if (inviteToken && loginCopy) loginCopy.textContent = t('host.inviteLoginCopy');
 
 function showLoginNotice(message, type = 'error') {
   loginNotice.textContent = message;
   loginNotice.className = `notice ${type}`;
+  loginNotice.classList.remove('hidden');
 }
 
 function showHostNotice(message, type = '') {
@@ -48,6 +56,111 @@ function showHostNotice(message, type = '') {
   hostNotice.className = `notice ${type}`.trim();
   hostNotice.classList.remove('hidden');
   noticeTimer = setTimeout(() => hostNotice.classList.add('hidden'), 3500);
+}
+
+async function hostQrApi(action, extra = {}) {
+  const { data, error } = await supabase.functions.invoke('claim-host-invite', {
+    body: { token: inviteToken, action, ...extra },
+  });
+
+  if (error || data?.error) {
+    throw new Error(data?.error || error?.message || t('host.inviteClaimFailed'));
+  }
+  return data;
+}
+
+async function prepareQrInvite() {
+  loginForm.classList.add('hidden');
+  qrJoinForm.classList.remove('hidden');
+  loginCopy.textContent = t('host.qrAccessCopy');
+
+  try {
+    const data = await hostQrApi('bootstrap');
+    activeAssignment = {
+      id: 'qr',
+      event_id: data.event_id,
+      event_name: data.event_name,
+      event_slug: data.event_slug,
+      expires_at: data.expires_at,
+    };
+    qrEventName.textContent = data.event_name;
+
+    const savedName = localStorage.getItem(qrNameStorageKey || '')?.trim();
+    if (savedName) {
+      qrHostNameInput.value = savedName;
+      await enterQrDashboard(savedName);
+    }
+  } catch (error) {
+    qrJoinForm.classList.add('hidden');
+    showLoginNotice(error.message || t('host.inviteClaimFailed'), 'error');
+  }
+}
+
+qrJoinForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const name = qrHostNameInput.value.trim();
+  if (!name) {
+    showLoginNotice(t('host.qrNameRequired'), 'error');
+    qrHostNameInput.focus();
+    return;
+  }
+  localStorage.setItem(qrNameStorageKey, name.slice(0, 80));
+  await enterQrDashboard(name.slice(0, 80));
+});
+
+async function enterQrDashboard(name) {
+  qrHostName = name;
+  loginView.classList.add('hidden');
+  dashboardView.classList.remove('hidden');
+  eventSelectLabel?.classList.add('hidden');
+  logoutButton.textContent = t('host.leaveAccess');
+  identity.textContent = t('host.qrIdentity', { name });
+  eventName.textContent = activeAssignment.event_name;
+  songRequestLink.href = buildGuestUrl(activeAssignment.event_slug, 'song');
+  karaokeRequestLink.href = buildGuestUrl(activeAssignment.event_slug, 'karaoke');
+
+  const ok = await loadQrQueue(true);
+  if (!ok) return;
+  startQrPolling();
+  showHostNotice(t('host.qrAccessGranted'), 'success');
+}
+
+async function loadQrQueue(initial = false) {
+  if (!inviteToken || !activeAssignment) return false;
+
+  try {
+    const data = await hostQrApi('queue');
+    const nextRequests = data.requests || [];
+    hostCalls = new Map((data.calls || []).map(row => [row.request_id, row]));
+
+    if (!initial) {
+      nextRequests
+        .filter(row => row.status === 'playing' && !announcedReady.has(row.id))
+        .forEach(row => {
+          announcedReady.add(row.id);
+          announceReady(row);
+        });
+    }
+
+    requests = nextRequests;
+    if (initial) seedReadyAnnouncements();
+    renderHostQueues();
+    return true;
+  } catch (error) {
+    stopQrPolling();
+    showHostNotice(error.message || t('host.inviteClaimFailed'), 'error');
+    return false;
+  }
+}
+
+function startQrPolling() {
+  stopQrPolling();
+  qrPollTimer = setInterval(() => loadQrQueue(false), 3000);
+}
+
+function stopQrPolling() {
+  if (qrPollTimer) clearInterval(qrPollTimer);
+  qrPollTimer = null;
 }
 
 loginForm.addEventListener('submit', async event => {
@@ -86,36 +199,23 @@ createAccountButton.addEventListener('click', async () => {
 
 logoutButton.addEventListener('click', async () => {
   teardownRealtime();
+
+  if (inviteToken) {
+    if (qrNameStorageKey) localStorage.removeItem(qrNameStorageKey);
+    location.reload();
+    return;
+  }
+
   await supabase.auth.signOut();
   location.reload();
 });
 
-async function claimInviteIfPresent() {
-  if (!inviteToken || !session) return true;
-
-  showLoginNotice(t('host.inviteClaiming'), 'success');
-  const { data, error } = await supabase.functions.invoke('claim-host-invite', {
-    body: { token: inviteToken },
-  });
-
-  if (error || data?.error) {
-    showLoginNotice(data?.error || error?.message || t('host.inviteClaimFailed'), 'error');
-    return false;
-  }
-
-  const cleanUrl = new URL(location.href);
-  cleanUrl.searchParams.delete('invite');
-  history.replaceState({}, '', cleanUrl);
-  return true;
-}
-
 async function enterHostDashboard() {
-  if (!(await claimInviteIfPresent())) return;
   loginView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
+  eventSelectLabel?.classList.remove('hidden');
   identity.textContent = session?.user?.email || '';
   await loadAssignments();
-  if (inviteToken) showHostNotice(t('host.inviteClaimed'), 'success');
 }
 
 async function loadAssignments() {
@@ -262,7 +362,23 @@ function renderQueueCard(row) {
 }
 
 async function markCalled(requestId) {
-  if (!activeAssignment || !session?.user?.email) return;
+  if (!activeAssignment) return;
+
+  if (inviteToken) {
+    try {
+      await hostQrApi('mark_called', {
+        request_id: requestId,
+        host_name: qrHostName || t('host.eventHost'),
+      });
+      await loadQrQueue(false);
+      showHostNotice(t('host.calledSaved'), 'success');
+    } catch (error) {
+      showHostNotice(error.message || t('host.inviteClaimFailed'), 'error');
+    }
+    return;
+  }
+
+  if (!session?.user?.email) return;
   const payload = {
     request_id: requestId,
     event_id: activeAssignment.event_id,
@@ -283,7 +399,7 @@ function seedReadyAnnouncements() {
 
 function subscribeRealtime() {
   teardownRealtime();
-  if (!activeAssignment) return;
+  if (!activeAssignment || inviteToken) return;
 
   realtimeChannel = supabase
     .channel(`dropmysong-host-${activeAssignment.event_id}`)
@@ -306,6 +422,7 @@ function subscribeRealtime() {
 function teardownRealtime() {
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
   realtimeChannel = null;
+  stopQrPolling();
 }
 
 enableAlertsButton.addEventListener('click', async () => {
@@ -371,7 +488,13 @@ async function announceReady(row) {
 
 window.addEventListener('dropmysong:languagechange', () => {
   applyTranslations();
-  if (inviteToken && loginCopy && !loginView.classList.contains('hidden')) loginCopy.textContent = t('host.inviteLoginCopy');
+  if (inviteToken && !loginView.classList.contains('hidden')) {
+    loginCopy.textContent = t('host.qrAccessCopy');
+  }
+  if (inviteToken && !dashboardView.classList.contains('hidden')) {
+    logoutButton.textContent = t('host.leaveAccess');
+    identity.textContent = t('host.qrIdentity', { name: qrHostName });
+  }
   if (activeAssignment) {
     eventName.textContent = activeAssignment.event_name;
     renderHostQueues();
@@ -380,6 +503,10 @@ window.addEventListener('dropmysong:languagechange', () => {
 
 window.addEventListener('beforeunload', teardownRealtime);
 
-const { data: sessionData } = await supabase.auth.getSession();
-session = sessionData.session;
-if (session) await enterHostDashboard();
+if (inviteToken) {
+  await prepareQrInvite();
+} else {
+  const { data: sessionData } = await supabase.auth.getSession();
+  session = sessionData.session;
+  if (session) await enterHostDashboard();
+}
