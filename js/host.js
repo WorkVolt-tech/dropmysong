@@ -27,6 +27,10 @@ const readyCount = document.querySelector('#hostReadyCount');
 const queueCount = document.querySelector('#hostQueueCount');
 const songRequestLink = document.querySelector('#hostSongRequestLink');
 const karaokeRequestLink = document.querySelector('#hostKaraokeRequestLink');
+const requestFormWrap = document.querySelector('#hostRequestFormWrap');
+const requestFrame = document.querySelector('#hostRequestFrame');
+const requestFormTitle = document.querySelector('#hostRequestFormTitle');
+const closeRequestFormButton = document.querySelector('#hostCloseRequestForm');
 
 const inviteToken = new URLSearchParams(location.search).get('invite');
 const qrNameStorageKey = inviteToken ? `dropmysong_qr_host_name_${inviteToken.slice(-16)}` : null;
@@ -140,9 +144,6 @@ async function enterQrDashboard(name) {
   logoutButton.textContent = t('host.leaveAccess');
   identity.textContent = t('host.qrIdentity', { name });
   eventName.textContent = activeAssignment.event_name;
-  songRequestLink.href = buildGuestUrl(activeAssignment.event_slug, 'song');
-  karaokeRequestLink.href = buildGuestUrl(activeAssignment.event_slug, 'karaoke');
-
   const ok = await loadQrQueue(true);
   if (!ok) return;
   startQrPolling();
@@ -264,8 +265,8 @@ async function loadAssignments() {
     queueList.innerHTML = `<div class="empty-state">${escapeHtml(t('host.notAssigned'))}</div>`;
     readyCount.textContent = '0';
     queueCount.textContent = '0';
-    songRequestLink.removeAttribute('href');
-    karaokeRequestLink.removeAttribute('href');
+    requestFormWrap.classList.add('hidden');
+    requestFrame.removeAttribute('src');
     teardownRealtime();
     return;
   }
@@ -280,14 +281,43 @@ async function loadAssignments() {
   await activateAssignment(activeAssignment.id);
 }
 
-eventSelect.addEventListener('change', () => activateAssignment(eventSelect.value));
+eventSelect.addEventListener('change', () => {
+  requestFormWrap.classList.add('hidden');
+  requestFrame.removeAttribute('src');
+  activateAssignment(eventSelect.value);
+});
+
+function embeddedRequestUrl(type) {
+  if (!activeAssignment?.event_slug) return '';
+  const url = new URL(buildGuestUrl(activeAssignment.event_slug, type));
+  url.searchParams.set('embed', 'host');
+  return url.toString();
+}
+
+function openHostRequestForm(type) {
+  if (!activeAssignment) {
+    showHostNotice(t('host.noEvent'), 'error');
+    return;
+  }
+
+  const karaoke = type === 'karaoke';
+  requestFormTitle.textContent = t(karaoke ? 'host.submitKaraoke' : 'host.submitSong');
+  requestFrame.src = embeddedRequestUrl(karaoke ? 'karaoke' : 'song');
+  requestFormWrap.classList.remove('hidden');
+  requestFormWrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+songRequestLink.addEventListener('click', () => openHostRequestForm('song'));
+karaokeRequestLink.addEventListener('click', () => openHostRequestForm('karaoke'));
+closeRequestFormButton.addEventListener('click', () => {
+  requestFormWrap.classList.add('hidden');
+  requestFrame.removeAttribute('src');
+});
 
 async function activateAssignment(assignmentId) {
   activeAssignment = assignments.find(item => item.id === assignmentId) || null;
   if (!activeAssignment) return;
   eventName.textContent = activeAssignment.event_name;
-  songRequestLink.href = buildGuestUrl(activeAssignment.event_slug, 'song');
-  karaokeRequestLink.href = buildGuestUrl(activeAssignment.event_slug, 'karaoke');
   await Promise.all([loadRequests(), loadHostCalls()]);
   seedReadyAnnouncements();
   subscribeRealtime();
