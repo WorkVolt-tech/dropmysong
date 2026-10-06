@@ -255,8 +255,9 @@ function cleanPayPalReturnUrl() {
 }
 
 async function startPayPalCheckout() {
-  if (!currentRequest?.id || currentRequest.payment_method !== 'paypal' || currentRequest.payment_status === 'confirmed') return;
+  if (paypalCheckoutBusy || !currentRequest?.id || currentRequest.payment_method !== 'paypal' || currentRequest.payment_status === 'confirmed') return;
 
+  const paymentWindow = embeddedForHost ? window.open('', '_blank') : null;
   paypalCheckoutBusy = true;
   renderPaymentStatus();
   clearNotice();
@@ -270,6 +271,8 @@ async function startPayPalCheckout() {
     });
 
     if (data?.confirmed) {
+      paypalCheckoutBusy = false;
+      paymentWindow?.close();
       currentRequest.payment_status = 'confirmed';
       renderPaymentStatus();
       await refreshStatus();
@@ -278,9 +281,11 @@ async function startPayPalCheckout() {
     }
 
     if (!data?.approve_url) throw new Error(t('guest.paypalAutomaticFailed'));
-    location.assign(data.approve_url);
+    if (paymentWindow) paymentWindow.location.href = data.approve_url;
+    else location.assign(data.approve_url);
   } catch (error) {
     paypalCheckoutBusy = false;
+    paymentWindow?.close();
     renderPaymentStatus();
     showNotice(error?.message || t('guest.paypalAutomaticFailed'), 'error');
   }
