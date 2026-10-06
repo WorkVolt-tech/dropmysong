@@ -83,6 +83,23 @@
       </label>
     </section>
 
+    <section class="panel host-share-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" data-i18n="host.shareEventEyebrow">SHARE EVENT</p>
+          <h2 data-i18n="host.shareEventTitle">Guest Event QR</h2>
+          <p class="muted" data-i18n="host.shareEventCopy">Let guests scan this QR to submit song or karaoke requests.</p>
+        </div>
+      </div>
+      <div class="host-share-layout">
+        <div id="hostEventQr" class="qr-code-box"></div>
+        <div class="host-share-details">
+          <div id="hostEventGuestLink" class="event-link-box"></div>
+          <button id="copyHostEventLink" class="secondary-button" type="button" data-i18n="host.copyGuestLink">Copy Guest Link</button>
+        </div>
+      </div>
+    </section>
+
     <section class="host-grid">
       <section class="panel host-ready-panel">
         <div class="section-heading">
@@ -123,6 +140,7 @@
     </section>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="./js/host.js"></script>
   <script type="module" src="./js/register-sw.js"></script>
 </body>
