@@ -1252,6 +1252,10 @@ function setTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.add('hidden'));
   document.querySelector(`#${currentTab}Tab`)?.classList.remove('hidden');
   updateDashboardHeader();
+  if (currentTab === 'analytics') {
+    renderAnalyticsEventOptions();
+    loadAnalytics(analyticsEventSelect.value || analyticsEventId || activeEvent?.id || events[0]?.id || null);
+  }
 }
 
 document.querySelectorAll('.nav-item').forEach(button => {
