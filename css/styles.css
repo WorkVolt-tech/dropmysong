@@ -606,6 +606,46 @@ a.music-preview:hover {
 }
 .tip-buttons button:disabled { opacity: .42; cursor: not-allowed; }
 
+/* Public recent-played history: intentionally contains no requester names. */
+.recent-played-panel {
+  margin: 16px 0;
+  padding: 16px;
+}
+.recent-played-panel h2 { margin: 0; font-size: clamp(1.2rem, 4vw, 1.55rem); }
+.recent-played-copy { margin: 8px 0 12px; line-height: 1.45; }
+.recent-played-list { display: grid; gap: 8px; }
+.recent-played-item {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 11px;
+  border: 1px solid rgba(118,145,188,.18);
+  border-radius: 13px;
+  background: rgba(6,11,19,.72);
+}
+.recent-played-number {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(0,194,255,.10);
+  color: #bfefff;
+  font-size: .75rem;
+  font-weight: 900;
+}
+.recent-played-item strong,
+.recent-played-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-played-item small { margin-top: 2px; color: var(--muted); }
+.empty-state.compact { padding: 14px; }
+
 
 /* Drop My Song queue reordering */
 .request-card { position: relative; }
