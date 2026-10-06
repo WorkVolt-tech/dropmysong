@@ -57,6 +57,8 @@ const paymentStatusPanel = document.querySelector('#paymentStatusPanel');
 const paymentStatusTitle = document.querySelector('#paymentStatusTitle');
 const paymentStatusText = document.querySelector('#paymentStatusText');
 const paypalPayButton = document.querySelector('#paypalPayButton');
+const recentPlayedPanel = document.querySelector('#recentPlayedPanel');
+const recentPlayedList = document.querySelector('#recentPlayedList');
 
 let requestType = params.get('type') === 'karaoke' ? 'karaoke' : 'song';
 let publicEvent = null;
@@ -70,6 +72,8 @@ let previewSequence = 0;
 let lastAutoArtist = '';
 let lastAutoSong = '';
 let availableTipOptions = [2, 5, 10, 20];
+let recentPlayedRows = [];
+let recentPlayedTimer = null;
 let pushRegisteredRequestId = localStorage.getItem(`dropmysong_push_request_${eventSlug}`) || null;
 
 function mayReplaceAutoFilled(input, lastAutoValue) {
@@ -346,6 +350,8 @@ async function loadEvent() {
 
   renderEventBanner();
   syncAvailability();
+  await loadRecentPlayed();
+  startRecentPlayedPolling();
   restoreLastRequest();
 }
 
@@ -354,6 +360,52 @@ function renderEventBanner() {
   const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
   eventBanner.innerHTML = `<strong>${escapeHtml(publicEvent.name)}</strong>${publicEvent.event_date ? ` · ${escapeHtml(new Date(publicEvent.event_date + 'T00:00:00').toLocaleDateString(locale))}` : ''}`;
   eventBanner.classList.remove('hidden');
+}
+
+function renderRecentPlayed() {
+  if (!recentPlayedPanel || !recentPlayedList) return;
+  recentPlayedPanel.classList.remove('hidden');
+  recentPlayedList.innerHTML = recentPlayedRows.length
+    ? recentPlayedRows.map((row, index) => `
+        <div class="recent-played-item">
+          <span class="recent-played-number">${index + 1}</span>
+          <div>
+            <strong>${escapeHtml(row.song)}</strong>
+            <small>${escapeHtml(row.artist)}</small>
+          </div>
+        </div>`).join('')
+    : `<div class="empty-state compact">${escapeHtml(t('guest.noRecentPlayed'))}</div>`;
+}
+
+async function loadRecentPlayed() {
+  if (!publicEvent?.id || !recentPlayedPanel || embeddedForHost) return;
+
+  const { data, error } = await supabase
+    .from('dropmysong_recent_played')
+    .select('artist,song,played_at')
+    .eq('event_id', publicEvent.id)
+    .order('played_at', { ascending: false })
+    .limit(5);
+
+  if (error) {
+    console.warn('Drop My Song recent played list unavailable:', error.message || error);
+    recentPlayedPanel.classList.add('hidden');
+    return;
+  }
+
+  recentPlayedRows = data || [];
+  renderRecentPlayed();
+}
+
+function startRecentPlayedPolling() {
+  stopRecentPlayedPolling();
+  if (embeddedForHost || !publicEvent?.id) return;
+  recentPlayedTimer = setInterval(loadRecentPlayed, 15000);
+}
+
+function stopRecentPlayedPolling() {
+  if (recentPlayedTimer) clearInterval(recentPlayedTimer);
+  recentPlayedTimer = null;
 }
 
 form.addEventListener('submit', async event => {
@@ -535,6 +587,7 @@ async function refreshStatus() {
     announceKaraokeReady(row);
   }
 
+  if (row.status === 'played') loadRecentPlayed();
   if (['played', 'rejected'].includes(row.status)) {
     stopPolling();
   }
@@ -767,6 +820,7 @@ window.addEventListener('dropmysong:languagechange', () => {
   renderTipOptions();
   syncPaymentUi();
   renderCurrentStatus();
+  renderRecentPlayed();
   if (!karaokeReadyAlert.classList.contains('hidden') && currentRequest) {
     karaokeReadySong.textContent = `${currentRequest.artist} — ${currentRequest.song}`;
   }
@@ -775,6 +829,7 @@ window.addEventListener('dropmysong:languagechange', () => {
 window.addEventListener('beforeunload', () => {
   teardownRequestRealtime();
   stopPolling();
+  stopRecentPlayedPolling();
 });
 
 loadEvent();
