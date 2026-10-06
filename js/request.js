@@ -73,6 +73,7 @@ let lastAutoArtist = '';
 let lastAutoSong = '';
 let availableTipOptions = [2, 5, 10, 20];
 let recentPlayedRows = [];
+let recentPlayedAvailable = false;
 let recentPlayedTimer = null;
 let pushRegisteredRequestId = localStorage.getItem(`dropmysong_push_request_${eventSlug}`) || null;
 
@@ -364,7 +365,8 @@ function renderEventBanner() {
 
 function renderRecentPlayed() {
   if (!recentPlayedPanel || !recentPlayedList) return;
-  recentPlayedPanel.classList.remove('hidden');
+  recentPlayedPanel.classList.toggle('hidden', !recentPlayedAvailable || embeddedForHost);
+  if (!recentPlayedAvailable || embeddedForHost) return;
   recentPlayedList.innerHTML = recentPlayedRows.length
     ? recentPlayedRows.map((row, index) => `
         <div class="recent-played-item">
@@ -388,11 +390,13 @@ async function loadRecentPlayed() {
     .limit(5);
 
   if (error) {
+    recentPlayedAvailable = false;
     console.warn('Drop My Song recent played list unavailable:', error.message || error);
-    recentPlayedPanel.classList.add('hidden');
+    renderRecentPlayed();
     return;
   }
 
+  recentPlayedAvailable = true;
   recentPlayedRows = data || [];
   renderRecentPlayed();
 }
