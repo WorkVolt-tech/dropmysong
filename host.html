@@ -32,6 +32,20 @@
           <button id="hostCreateAccount" class="secondary-button" type="button" data-i18n="host.createAccount">Create Host Account</button>
         </div>
       </form>
+
+      <form id="hostQrJoinForm" class="hidden">
+        <div class="host-qr-pass">
+          <span class="host-type-badge" data-i18n="host.qrPass">24-HOUR HOST PASS</span>
+          <h2 id="hostQrEventName" data-i18n="host.validatingInvite">Validating invite…</h2>
+          <p class="muted" data-i18n="host.qrMultiHostCopy">No account is required. The same QR can be used by multiple hosts until it expires.</p>
+        </div>
+        <label>
+          <span data-i18n="host.yourHostName">Your name</span>
+          <input id="hostQrName" maxlength="80" required data-i18n-placeholder="host.yourHostNamePlaceholder" placeholder="Name shown to the other hosts" />
+        </label>
+        <button class="primary-button" type="submit" data-i18n="host.enterDashboard">Enter Host Dashboard</button>
+      </form>
+
       <div id="hostLoginNotice" class="notice hidden"></div>
     </section>
   </div>
