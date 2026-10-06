@@ -964,7 +964,7 @@ function renderAnalyticsEventOptions() {
   }
 
   if (!analyticsEventId || !events.some(event => event.id === analyticsEventId)) {
-    analyticsEventId = activeEvent?.id || events[0]?.id || null;
+    analyticsEventId = activeEvent?.id || events.find(event => event.is_active && !event.archived_at)?.id || events[0]?.id || null;
   }
 
   const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
