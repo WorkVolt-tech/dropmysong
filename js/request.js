@@ -6,6 +6,7 @@ import { ETRANSFER_EMAIL, PAYPAL_ME_URL, VAPID_PUBLIC_KEY } from './config.js';
 
 const params = new URLSearchParams(location.search);
 const eventSlug = params.get('event');
+const embeddedForHost = params.get('embed') === 'host';
 const guestToken = getOrCreateGuestToken();
 
 const form = document.querySelector('#requestForm');
@@ -117,6 +118,7 @@ function scheduleSongLinkPreview() {
 }
 
 initI18n();
+if (embeddedForHost) document.body.classList.add('embedded-host-request');
 setRequestType(requestType, false);
 
 message.addEventListener('input', () => {
