@@ -48,12 +48,7 @@ const paypalEnabledSetting = document.querySelector('#paypalEnabledSetting');
 const paypalMeSetting = document.querySelector('#paypalMeSetting');
 const etransferEnabledSetting = document.querySelector('#etransferEnabledSetting');
 const etransferEmailSetting = document.querySelector('#etransferEmailSetting');
-const hostAccessForm = document.querySelector('#hostAccessForm');
 const hostAccessEventName = document.querySelector('#hostAccessEventName');
-const hostDisplayName = document.querySelector('#hostDisplayName');
-const hostEmail = document.querySelector('#hostEmail');
-const eventHostsList = document.querySelector('#eventHostsList');
-const copyHostLoginLink = document.querySelector('#copyHostLoginLink');
 const generateHostQr = document.querySelector('#generateHostQr');
 const regenerateHostQr = document.querySelector('#regenerateHostQr');
 const copyHostInviteLink = document.querySelector('#copyHostInviteLink');
@@ -76,8 +71,6 @@ let realtimeChannel = null;
 let currentTab = 'queue';
 let modalEvent = null;
 let noticeTimer = null;
-let eventHosts = [];
-let hostAccessReady = true;
 let hostInviteUrl = '';
 let hostInviteEventId = null;
 let queueReorderInProgress = false;
@@ -164,7 +157,7 @@ async function activateEvent(eventId) {
   tipsToggle.checked = !!activeEvent.tips_enabled;
   syncPaymentSettingsForm();
   clearHostInviteQr();
-  await loadEventHosts();
+  syncHostAccessPanel();
   renderEventLinksAndQr();
   await loadRequests();
   subscribeToRequests();
@@ -698,117 +691,12 @@ paymentSettingsForm.addEventListener('submit', async event => {
   showDashboardNotice(t('dashboard.paymentSettingsSaved'), 'success');
 });
 
-async function loadEventHosts() {
-  eventHosts = [];
-  hostAccessReady = true;
-  if (!activeEvent) {
-    syncHostAccessPanel();
-    return;
-  }
-
-  const { data, error } = await supabase
-    .from('event_hosts')
-    .select('id,event_id,host_email,display_name,event_name,event_slug,created_at')
-    .eq('event_id', activeEvent.id)
-    .order('created_at', { ascending: true });
-
-  if (error) {
-    hostAccessReady = false;
-    syncHostAccessPanel();
-    return;
-  }
-
-  eventHosts = data || [];
-  syncHostAccessPanel();
-}
-
 function syncHostAccessPanel() {
-  const disabled = !activeEvent || !hostAccessReady;
-  hostAccessForm.querySelectorAll('input,button').forEach(control => { control.disabled = disabled; });
+  const disabled = !activeEvent;
   generateHostQr.disabled = disabled;
   regenerateHostQr.disabled = disabled;
   copyHostInviteLink.disabled = !hostInviteUrl;
-  copyHostLoginLink.disabled = false;
   hostAccessEventName.textContent = activeEvent ? activeEvent.name : t('dashboard.selectEventForHost');
-
-  if (!activeEvent) {
-    eventHostsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.selectEventForHost'))}</div>`;
-    return;
-  }
-
-  if (!hostAccessReady) {
-    eventHostsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.hostSetupRequired'))}</div>`;
-    return;
-  }
-
-  eventHostsList.innerHTML = eventHosts.length
-    ? eventHosts.map(host => `
-        <div class="event-item host-access-item">
-          <div>
-            <strong>${escapeHtml(host.display_name || t('dashboard.eventHost'))}</strong>
-            <small>${escapeHtml(host.host_email)}</small>
-          </div>
-          <div class="event-actions">
-            <button class="action-button danger" type="button" data-remove-host="${host.id}">${escapeHtml(t('dashboard.removeHost'))}</button>
-          </div>
-        </div>`).join('')
-    : `<div class="empty-state">${escapeHtml(t('dashboard.noHosts'))}</div>`;
-
-  eventHostsList.querySelectorAll('[data-remove-host]').forEach(button => {
-    button.addEventListener('click', () => removeEventHost(button.dataset.removeHost));
-  });
-}
-
-hostAccessForm.addEventListener('submit', async event => {
-  event.preventDefault();
-  if (!activeEvent) return;
-
-  const email = hostEmail.value.trim().toLowerCase();
-  const displayName = hostDisplayName.value.trim();
-  if (!email) return;
-
-  const payload = {
-    event_id: activeEvent.id,
-    host_email: email,
-    display_name: displayName || null,
-    event_name: activeEvent.name,
-    event_slug: activeEvent.slug,
-  };
-
-  const existing = eventHosts.find(item => item.host_email.toLowerCase() === email);
-  let error;
-
-  if (existing) {
-    ({ error } = await supabase
-      .from('event_hosts')
-      .update({
-        display_name: payload.display_name,
-        event_name: payload.event_name,
-        event_slug: payload.event_slug,
-      })
-      .eq('id', existing.id));
-  } else {
-    ({ error } = await supabase.from('event_hosts').insert(payload));
-  }
-
-  if (error) {
-    showDashboardNotice(error.message, 'error');
-    return;
-  }
-
-  hostAccessForm.reset();
-  await loadEventHosts();
-  showDashboardNotice(t(existing ? 'dashboard.hostUpdated' : 'dashboard.hostAdded'), 'success');
-});
-
-async function removeEventHost(hostId) {
-  const { error } = await supabase.from('event_hosts').delete().eq('id', hostId);
-  if (error) {
-    showDashboardNotice(error.message, 'error');
-    return;
-  }
-  await loadEventHosts();
-  showDashboardNotice(t('dashboard.hostRemoved'), 'success');
 }
 
 function clearHostInviteQr() {
@@ -853,8 +741,8 @@ function renderHostInviteQr(url) {
 }
 
 async function createHostQrInvite() {
-  if (!activeEvent || !hostAccessReady) {
-    showDashboardNotice(t('dashboard.hostSetupRequired'), 'error');
+  if (!activeEvent) {
+    showDashboardNotice(t('dashboard.selectEventForHost'), 'error');
     return;
   }
 
@@ -873,7 +761,7 @@ async function createHostQrInvite() {
   if (deleteError) {
     generateHostQr.disabled = false;
     regenerateHostQr.disabled = false;
-    showDashboardNotice(t('dashboard.hostSetupRequired'), 'error');
+    showDashboardNotice(deleteError.message || t('dashboard.hostInviteCreateFailed'), 'error');
     return;
   }
 
@@ -909,12 +797,6 @@ copyHostInviteLink.addEventListener('click', async () => {
   if (!hostInviteUrl || hostInviteEventId !== activeEvent?.id) return;
   await copyText(hostInviteUrl);
   showDashboardNotice(t('dashboard.hostInviteLinkCopied'), 'success');
-});
-
-copyHostLoginLink.addEventListener('click', async () => {
-  const url = new URL('host.html', appBaseUrl()).toString();
-  await copyText(url);
-  showDashboardNotice(t('dashboard.hostLinkCopied'), 'success');
 });
 
 copyEventLink.addEventListener('click', async () => {
