@@ -1917,3 +1917,15 @@ select:hover {
   .analytics-rank-count,
   .analytics-played-time { grid-column: 2; justify-self: start; }
 }
+
+
+.delete-event-button {
+  color: #ff9aac;
+  border-color: rgba(255,77,109,.28);
+  background: rgba(255,77,109,.055);
+}
+.delete-event-button:hover {
+  color: #ffd4dc;
+  border-color: rgba(255,77,109,.5);
+  background: rgba(255,77,109,.10);
+}
