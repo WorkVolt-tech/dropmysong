@@ -272,9 +272,9 @@ function setRequestType(type, updateUrl = true) {
   heroSubtitle.textContent = t(karaoke ? 'guest.subtitle.karaoke' : 'guest.subtitle.song');
   requesterLabelText.textContent = t(karaoke ? 'guest.singerName' : 'guest.yourName');
   requesterName.placeholder = t(karaoke ? 'guest.singerPlaceholder' : 'guest.namePlaceholder');
-  requesterName.required = karaoke;
-  requesterOptional.classList.toggle('hidden', karaoke);
-  requesterRequired.classList.toggle('hidden', !karaoke);
+  requesterName.required = true;
+  requesterOptional.classList.add('hidden');
+  requesterRequired.classList.remove('hidden');
   message.placeholder = t(karaoke ? 'guest.karaokeMessagePlaceholder' : 'guest.messagePlaceholder');
   submitButton.textContent = t(karaoke ? 'guest.submit.karaoke' : 'guest.submit.song');
 
@@ -371,8 +371,9 @@ form.addEventListener('submit', async event => {
     showNotice(t('notice.invalidLink'), 'error');
     return;
   }
-  if (requestType === 'karaoke' && !name) {
-    showNotice(t('notice.singerRequired'), 'error');
+  if (!name) {
+    showNotice(t(requestType === 'karaoke' ? 'notice.singerRequired' : 'notice.nameRequired'), 'error');
+    requesterName.focus();
     return;
   }
 
