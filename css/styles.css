@@ -810,6 +810,25 @@ a.music-preview:hover {
 .host-request-links { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
 .host-request-links a,
 .host-request-links button { text-align: center; text-decoration: none; }
+
+.host-share-panel {
+  margin-top: 14px;
+  padding: 16px;
+}
+.host-share-panel h2 { margin: 0; }
+.host-share-panel .section-heading p:last-child { margin: 6px 0 0; }
+.host-share-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 12px;
+}
+.host-share-layout .qr-code-box { margin: 0; }
+.host-share-details { min-width: 0; }
+.host-share-details .event-link-box { margin-top: 0; }
+.host-share-details .secondary-button { width: 100%; }
+
 .host-request-form-wrap {
   margin-top: 14px;
   padding-top: 14px;
