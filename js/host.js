@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { buildGuestUrl, escapeHtml, relativeTime } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 
@@ -59,13 +60,33 @@ function showHostNotice(message, type = '') {
 }
 
 async function hostQrApi(action, extra = {}) {
-  const { data, error } = await supabase.functions.invoke('claim-host-invite', {
-    body: { token: inviteToken, action, ...extra },
-  });
-
-  if (error || data?.error) {
-    throw new Error(data?.error || error?.message || t('host.inviteClaimFailed'));
+  let response;
+  try {
+    response = await fetch(`${SUPABASE_URL}/functions/v1/claim-host-invite`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ token: inviteToken, action, ...extra }),
+    });
+  } catch (error) {
+    console.error('Host QR network error', error);
+    throw new Error(t('host.functionUnreachable'));
   }
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok || data?.error) {
+    console.error('Host QR function error', response.status, data);
+    throw new Error(data?.error || t('host.functionFailed', { status: response.status }));
+  }
+
   return data;
 }
 
