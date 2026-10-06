@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient.js';
+import { ETRANSFER_EMAIL, PAYPAL_ME_URL } from './config.js';
 import { appBaseUrl, buildGuestUrl, escapeHtml, relativeTime, slugify } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 import { hydrateLinkPreviews } from './linkPreview.js';
@@ -44,10 +45,8 @@ const paymentSettingsForm = document.querySelector('#paymentSettingsForm');
 const paymentSettingsEventName = document.querySelector('#paymentSettingsEventName');
 const requireTipSetting = document.querySelector('#requireTipSetting');
 const tipOptionInputs = [...document.querySelectorAll('.tip-option-input')];
-const paypalEnabledSetting = document.querySelector('#paypalEnabledSetting');
-const paypalMeSetting = document.querySelector('#paypalMeSetting');
-const etransferEnabledSetting = document.querySelector('#etransferEnabledSetting');
-const etransferEmailSetting = document.querySelector('#etransferEmailSetting');
+const paypalConfiguredValue = document.querySelector('#paypalConfiguredValue');
+const etransferConfiguredValue = document.querySelector('#etransferConfiguredValue');
 const hostAccessEventName = document.querySelector('#hostAccessEventName');
 const generateHostQr = document.querySelector('#generateHostQr');
 const regenerateHostQr = document.querySelector('#regenerateHostQr');
@@ -593,11 +592,6 @@ karaokeStatusFilter.addEventListener('change', renderKaraokeRequests);
 requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked, t('dashboard.requests')));
 karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
 tipsToggle.addEventListener('change', async () => {
-  if (tipsToggle.checked && activeEvent && !activeEvent.paypal_enabled && !activeEvent.etransfer_enabled) {
-    tipsToggle.checked = false;
-    showDashboardNotice(t('dashboard.enablePaymentFirst'), 'error');
-    return;
-  }
   await updateEventSetting('tips_enabled', tipsToggle.checked, t('dashboard.tipsRequired'));
   requireTipSetting.checked = tipsToggle.checked;
 });
@@ -634,10 +628,8 @@ function syncPaymentSettingsForm() {
   requireTipSetting.checked = !!activeEvent.tips_enabled;
   const options = normalizeTipOptions(activeEvent.tip_options);
   tipOptionInputs.forEach((input, index) => { input.value = options[index]; });
-  paypalEnabledSetting.checked = !!activeEvent.paypal_enabled;
-  paypalMeSetting.value = activeEvent.paypal_me_url || '';
-  etransferEnabledSetting.checked = !!activeEvent.etransfer_enabled;
-  etransferEmailSetting.value = activeEvent.etransfer_email || '';
+  paypalConfiguredValue.textContent = PAYPAL_ME_URL;
+  etransferConfiguredValue.textContent = ETRANSFER_EMAIL;
 }
 
 paymentSettingsForm.addEventListener('submit', async event => {
@@ -650,32 +642,11 @@ paymentSettingsForm.addEventListener('submit', async event => {
     return;
   }
 
-  const paypalEnabled = paypalEnabledSetting.checked;
-  const paypalMeUrl = paypalMeSetting.value.trim();
-  const etransferEnabled = etransferEnabledSetting.checked;
-  const etransferEmail = etransferEmailSetting.value.trim();
   const tipsRequired = requireTipSetting.checked;
-
-  if (paypalEnabled && !/^https:\/\/(www\.)?paypal\.me\/[A-Za-z0-9._-]+\/?$/i.test(paypalMeUrl)) {
-    showDashboardNotice(t('dashboard.validPaypalLinkRequired'), 'error');
-    return;
-  }
-  if (etransferEnabled && !etransferEmail) {
-    showDashboardNotice(t('dashboard.etransferEmailRequired'), 'error');
-    return;
-  }
-  if (tipsRequired && !paypalEnabled && !etransferEnabled) {
-    showDashboardNotice(t('dashboard.enablePaymentFirst'), 'error');
-    return;
-  }
 
   const payload = {
     tips_enabled: tipsRequired,
     tip_options: tipOptions,
-    paypal_enabled: paypalEnabled,
-    paypal_me_url: paypalEnabled ? paypalMeUrl : null,
-    etransfer_enabled: etransferEnabled,
-    etransfer_email: etransferEnabled ? etransferEmail : null,
   };
 
   const { error } = await supabase.from('events').update(payload).eq('id', activeEvent.id);
