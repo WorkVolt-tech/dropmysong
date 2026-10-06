@@ -891,3 +891,82 @@ body.embedded-host-request .hero-copy h1 {
   .host-request-form-head { align-items: stretch; flex-direction: column; }
   .host-request-frame { min-height: 720px; height: 78dvh; }
 }
+
+
+/* Drop My Song responsive hardening across phones, tablets and desktop browsers */
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+img, svg, video { max-width: 100%; }
+button, a, input, textarea, select { min-width: 0; }
+.dashboard-main,
+.guest-shell,
+.host-shell,
+.panel { min-width: 0; }
+
+@supports (min-height: 100dvh) {
+  body,
+  .login-shell,
+  .dashboard-shell { min-height: 100dvh; }
+}
+
+@media (pointer: coarse) {
+  button,
+  .primary-button,
+  .secondary-button,
+  .ghost-button,
+  .action-button,
+  .nav-item {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 760px) {
+  .host-share-layout {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+  .host-share-layout .qr-code-box { margin: 0 auto; }
+  .host-share-details { width: 100%; }
+  .recent-played-panel { margin: 12px 0; }
+}
+
+@media (max-width: 560px) {
+  .guest-shell { padding: 18px 12px 52px; }
+  .brand-header { align-items: flex-start; flex-wrap: wrap; }
+  .brand-logo { width: min(250px, 72vw); }
+  .hero-copy { padding: 28px 4px 16px; }
+  .hero-copy h1 { font-size: clamp(1.8rem, 10vw, 2.55rem); }
+  .request-form,
+  .status-panel,
+  .recent-played-panel,
+  .host-share-panel,
+  .host-grid > .panel,
+  .host-event-bar,
+  .host-topbar { padding: 14px; }
+  .section-heading { align-items: flex-start; }
+  .tip-panel-heading { flex-direction: column; }
+  .tip-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .payment-method-grid,
+  .tip-option-settings { grid-template-columns: 1fr; }
+  .host-shell { width: min(100% - 16px, 1180px); padding-top: 8px; }
+  .host-brand-line { flex-direction: column; gap: 8px; }
+  .host-brand-line img { width: min(180px, 60vw); }
+  .host-top-actions { width: 100%; }
+  .host-top-actions > button { flex: 1 1 150px; }
+  .host-share-layout .qr-code-box,
+  .qr-code-box { width: min(196px, 100%); min-height: auto; aspect-ratio: 1 / 1; }
+  input, textarea, select { font-size: 16px; }
+}
+
+@media (max-width: 400px) {
+  .guest-shell { padding-left: 9px; padding-right: 9px; }
+  .panel { border-radius: 16px; }
+  .request-mode-switch { grid-template-columns: 1fr; }
+  .recent-played-item { grid-template-columns: 30px minmax(0, 1fr); padding: 9px; }
+  .host-top-actions,
+  .host-request-links { display: grid; grid-template-columns: 1fr; width: 100%; }
+  .language-switch { max-width: 100%; }
+}
