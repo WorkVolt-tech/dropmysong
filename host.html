@@ -107,10 +107,17 @@
       <section class="panel host-submit-panel">
         <p class="eyebrow" data-i18n="host.submitEyebrow">SUBMIT A REQUEST</p>
         <h2 data-i18n="host.submitTitle">Add a Song or Karaoke Request</h2>
-        <p class="muted" data-i18n="host.submitCopy">Use the same guest form so all event rules, links and tip settings still apply.</p>
+        <p class="muted" data-i18n="host.submitCopy">Choose Song or Karaoke and the request form will open right here without leaving the host dashboard.</p>
         <div class="host-request-links">
-          <a id="hostSongRequestLink" class="primary-button" target="_blank" rel="noopener" data-i18n="host.submitSong">♫ Submit Song Request</a>
-          <a id="hostKaraokeRequestLink" class="secondary-button" target="_blank" rel="noopener" data-i18n="host.submitKaraoke">🎤 Submit Karaoke Request</a>
+          <button id="hostSongRequestLink" class="primary-button" type="button" data-i18n="host.submitSong">♫ Submit Song Request</button>
+          <button id="hostKaraokeRequestLink" class="secondary-button" type="button" data-i18n="host.submitKaraoke">🎤 Submit Karaoke Request</button>
+        </div>
+        <div id="hostRequestFormWrap" class="host-request-form-wrap hidden">
+          <div class="host-request-form-head">
+            <strong id="hostRequestFormTitle" data-i18n="host.submitSong">♫ Submit Song Request</strong>
+            <button id="hostCloseRequestForm" class="ghost-button" type="button" data-i18n="host.closeRequestForm">Close Form</button>
+          </div>
+          <iframe id="hostRequestFrame" class="host-request-frame" title="Drop My Song request form"></iframe>
         </div>
       </section>
     </section>
