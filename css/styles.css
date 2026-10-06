@@ -801,7 +801,8 @@ body.embedded-host-request .guest-shell {
   padding: 4px 4px 24px;
 }
 body.embedded-host-request .brand-header,
-body.embedded-host-request .request-mode-switch {
+body.embedded-host-request .request-mode-switch,
+body.embedded-host-request .recent-played-panel {
   display: none;
 }
 body.embedded-host-request .event-banner {
@@ -829,5 +830,5 @@ body.embedded-host-request .hero-copy h1 {
   .host-submit-panel { grid-column: auto; }
   .host-request-links, .host-auth-actions { grid-template-columns: 1fr; }
   .host-request-form-head { align-items: stretch; flex-direction: column; }
-  .host-request-frame { min-height: 1120px; }
+  .host-request-frame { min-height: 720px; height: 78dvh; }
 }
