@@ -1929,3 +1929,10 @@ select:hover {
   border-color: rgba(255,77,109,.5);
   background: rgba(255,77,109,.10);
 }
+
+
+.payment-paypal-button[aria-disabled="true"] {
+  opacity: .58;
+  pointer-events: none;
+  cursor: wait;
+}
