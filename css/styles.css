@@ -1180,6 +1180,7 @@ select:hover {
 .nav-item[data-tab="queue"]::before { content: "♫"; }
 .nav-item[data-tab="karaoke"]::before { content: "🎤"; font-size: .78rem; }
 .nav-item[data-tab="played"]::before { content: "✓"; }
+.nav-item[data-tab="analytics"]::before { content: "▥"; font-size: .72rem; }
 .nav-item[data-tab="events"]::before { content: "◆"; font-size: .65rem; }
 .nav-item:hover {
   border-color: rgba(76,165,255,.13);
@@ -1683,4 +1684,236 @@ select:hover {
   .host-shell {
     width: calc(100% - 12px);
   }
+}
+
+
+/* Drop My Song analytics + event archive */
+.analytics-toolbar {
+  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 430px);
+  gap: 20px;
+  align-items: end;
+  margin-bottom: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(123,44,255,.09), transparent 40%),
+    linear-gradient(180deg, rgba(14,23,39,.96), rgba(7,12,22,.96));
+}
+.analytics-toolbar h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); }
+.analytics-toolbar p:last-child { margin-bottom: 0; line-height: 1.5; }
+.analytics-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: end;
+}
+.analytics-controls label { margin: 0; }
+.analytics-controls label > span {
+  display: block;
+  margin: 0 0 7px 4px;
+  color: #d7deea;
+  font-size: .78rem;
+  font-weight: 800;
+}
+.analytics-controls select,
+.analytics-controls button { min-height: 46px; }
+
+.analytics-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.analytics-kpi {
+  position: relative;
+  overflow: hidden;
+  padding: 16px;
+  min-height: 126px;
+}
+.analytics-kpi::after {
+  content: "";
+  position: absolute;
+  right: -22px;
+  top: -25px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: rgba(0,194,255,.07);
+  filter: blur(4px);
+  pointer-events: none;
+}
+.analytics-kpi:nth-child(2)::after { background: rgba(54,219,154,.07); }
+.analytics-kpi:nth-child(3)::after { background: rgba(123,44,255,.10); }
+.analytics-kpi:nth-child(4)::after { background: rgba(255,77,109,.07); }
+.analytics-kpi > span {
+  display: block;
+  color: #9fb0c5;
+  font-size: .72rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .045em;
+}
+.analytics-kpi > strong {
+  display: block;
+  margin: 10px 0 5px;
+  color: white;
+  font-size: clamp(1.65rem, 4vw, 2.45rem);
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+.analytics-kpi > small { display: block; line-height: 1.35; }
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.analytics-panel { padding: 16px; }
+.analytics-panel h2 { font-size: 1.05rem; }
+.analytics-rank-list,
+.analytics-status-list,
+.archive-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.analytics-rank-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid rgba(111,145,194,.15);
+  border-radius: 13px;
+  background: rgba(4,9,17,.58);
+}
+.analytics-rank-number {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 1px solid rgba(0,194,255,.18);
+  background: rgba(0,194,255,.07);
+  color: #8cddff;
+  font-size: .72rem;
+  font-weight: 900;
+}
+.analytics-rank-item > div { min-width: 0; }
+.analytics-rank-item strong,
+.analytics-rank-item small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.analytics-rank-item small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .74rem;
+}
+.analytics-rank-count {
+  min-width: 38px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  text-align: center;
+  background: rgba(123,44,255,.11);
+  border: 1px solid rgba(151,93,255,.22);
+  color: #dfc9ff;
+  font-size: .72rem;
+  font-weight: 900;
+}
+.analytics-played-time {
+  color: #8292a7;
+  font-size: .69rem;
+  white-space: nowrap;
+}
+
+.analytics-status-row {
+  display: grid;
+  gap: 6px;
+}
+.analytics-status-row > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: .78rem;
+}
+.analytics-status-row > div:first-child span { color: #8494aa; font-weight: 800; }
+.analytics-status-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(111,145,194,.10);
+}
+.analytics-status-track i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #11bbff, #6e49ff);
+}
+.analytics-status-track i.status-played { background: linear-gradient(90deg, #22c987, #45e2ad); }
+.analytics-status-track i.status-playing { background: linear-gradient(90deg, #7a4bff, #cb43ff); }
+.analytics-status-track i.status-pending { background: linear-gradient(90deg, #d9a52f, #ffc857); }
+.analytics-status-track i.status-rejected,
+.analytics-status-track i.status-cant_find { background: linear-gradient(90deg, #ff4d6d, #ff7b92); }
+
+.archive-panel {
+  margin-top: 12px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 100% 100%, rgba(123,44,255,.075), transparent 34%),
+    linear-gradient(180deg, rgba(13,21,35,.94), rgba(7,12,22,.94));
+}
+.archive-panel > .muted { margin: 7px 0 0; }
+.archive-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(118,145,188,.16);
+  border-radius: 14px;
+  background: rgba(5,10,18,.62);
+}
+.archive-item strong,
+.archive-item small { display: block; }
+.archive-item small { margin-top: 4px; color: var(--muted); }
+.archive-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.archive-event-button {
+  color: #ffcb91;
+  border-color: rgba(255,167,78,.22);
+}
+
+@media (max-width: 1180px) {
+  .analytics-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 820px) {
+  .analytics-toolbar { grid-template-columns: 1fr; }
+  .analytics-controls { grid-template-columns: 1fr 1fr; }
+  .analytics-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .analytics-toolbar,
+  .analytics-panel,
+  .archive-panel { padding: 14px; }
+  .analytics-kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .analytics-kpi { min-height: 112px; padding: 13px; }
+  .analytics-controls { grid-template-columns: 1fr; }
+  .analytics-controls button { width: 100%; }
+  .archive-item { grid-template-columns: 1fr; }
+  .archive-actions { justify-content: stretch; }
+  .archive-actions button { flex: 1 1 140px; }
+}
+
+@media (max-width: 390px) {
+  .analytics-kpis { grid-template-columns: 1fr; }
+  .analytics-rank-item { grid-template-columns: 30px minmax(0, 1fr); }
+  .analytics-rank-count,
+  .analytics-played-time { grid-column: 2; justify-self: start; }
 }
