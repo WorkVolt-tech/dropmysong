@@ -1,2 +1,5 @@
 [functions.claim-host-invite]
 verify_jwt = false
+
+[functions.paypal-payment]
+verify_jwt = false
