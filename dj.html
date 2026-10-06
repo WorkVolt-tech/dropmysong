@@ -224,6 +224,25 @@
               <button id="copyHostLoginLink" class="secondary-button" type="button" data-i18n="dashboard.copyHostLink">Copy Host Link</button>
             </div>
 
+            <div class="host-qr-invite">
+              <div class="section-heading">
+                <div>
+                  <strong data-i18n="dashboard.hostQrTitle">Host QR invite</strong>
+                  <p class="muted" data-i18n="dashboard.hostQrCopy">Don't have the host's contact info? Generate a one-time QR code they can scan to claim host access.</p>
+                </div>
+                <button id="generateHostQr" class="secondary-button" type="button" data-i18n="dashboard.generateHostQr">Generate Host QR</button>
+              </div>
+              <div id="hostInviteQrWrap" class="host-invite-qr hidden">
+                <div id="hostInviteQr" class="qr-code-box"></div>
+                <div id="hostInviteLink" class="event-link-box"></div>
+                <div class="host-invite-actions">
+                  <button id="copyHostInviteLink" class="secondary-button" type="button" data-i18n="dashboard.copyHostInvite">Copy Invite Link</button>
+                  <button id="regenerateHostQr" class="ghost-button" type="button" data-i18n="dashboard.newHostQr">New QR</button>
+                </div>
+                <p class="muted host-invite-expiry" data-i18n="dashboard.hostInviteExpires">This QR expires in 24 hours and can be claimed by one host.</p>
+              </div>
+            </div>
+
             <div id="eventHostsList" class="events-list"></div>
           </section>
 
