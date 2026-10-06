@@ -23,6 +23,17 @@
 
     <section id="eventBanner" class="event-banner hidden"></section>
 
+    <section id="recentPlayedPanel" class="panel recent-played-panel hidden" aria-live="polite">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" data-i18n="guest.recentPlayedEyebrow">TONIGHT</p>
+          <h2 data-i18n="guest.recentPlayedTitle">Last 5 Played Songs</h2>
+        </div>
+      </div>
+      <p class="muted recent-played-copy" data-i18n="guest.recentPlayedCopy">See what was already played tonight. Requester names are never shown here.</p>
+      <div id="recentPlayedList" class="recent-played-list"></div>
+    </section>
+
     <section class="request-mode-switch panel" aria-label="Request type">
       <button type="button" class="request-mode active" data-request-type="song">
         <span class="request-mode-icon">♫</span>
