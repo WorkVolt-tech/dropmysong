@@ -1,5 +1,5 @@
 -- Drop My Song - Host access upgrade
--- Run this once in the Supabase SQL editor before using host.html.
+-- Run this once in the Supabase SQL editor before using host access or host QR invites.
 
 CREATE TABLE IF NOT EXISTS public.event_hosts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -43,6 +43,47 @@ FOR SELECT
 TO authenticated
 USING (
   lower(host_email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+);
+
+CREATE TABLE IF NOT EXISTS public.host_invites (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid NOT NULL REFERENCES public.events(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  event_name text NOT NULL,
+  event_slug text NOT NULL,
+  created_by uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  claimed_at timestamptz,
+  claimed_by uuid,
+  claimed_email text
+);
+
+ALTER TABLE public.host_invites ENABLE ROW LEVEL SECURITY;
+
+CREATE INDEX IF NOT EXISTS host_invites_event_id_idx
+ON public.host_invites (event_id, created_at DESC);
+
+DROP POLICY IF EXISTS "DMS owners manage host invites" ON public.host_invites;
+CREATE POLICY "DMS owners manage host invites"
+ON public.host_invites
+FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.events e
+    WHERE e.id = host_invites.event_id
+      AND e.owner_id = auth.uid()
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1
+    FROM public.events e
+    WHERE e.id = host_invites.event_id
+      AND e.owner_id = auth.uid()
+  )
 );
 
 DROP POLICY IF EXISTS "DMS hosts read assigned requests" ON public.song_requests;
@@ -118,5 +159,6 @@ USING (
 );
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.event_hosts TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.host_invites TO authenticated;
 GRANT SELECT, INSERT ON public.host_calls TO authenticated;
 GRANT SELECT ON public.song_requests TO authenticated;
