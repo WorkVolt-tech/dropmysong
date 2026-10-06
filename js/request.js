@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient.js';
 import { escapeHtml, getOrCreateGuestToken, isHttpUrl } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 import { getLinkPreview, renderLinkPreviewInto } from './linkPreview.js';
-import { VAPID_PUBLIC_KEY } from './config.js';
+import { ETRANSFER_EMAIL, PAYPAL_ME_URL, VAPID_PUBLIC_KEY } from './config.js';
 
 const params = new URLSearchParams(location.search);
 const eventSlug = params.get('event');
@@ -330,12 +330,17 @@ async function loadEvent() {
   if (!optionsError && optionRows?.length) {
     publicEvent = { ...publicEvent, ...optionRows[0] };
   } else {
-    // Safe fallback for an event created before the payment settings existed.
+    // Safe fallback for an event created before the optional settings existed.
     publicEvent.karaoke_enabled = true;
     publicEvent.tip_options = [2, 5, 10, 20];
-    publicEvent.paypal_enabled = false;
-    publicEvent.etransfer_enabled = false;
   }
+
+  // Drop My Song is currently for DJ Maxo, so payment destinations are global
+  // rather than saved separately on every event.
+  publicEvent.paypal_enabled = true;
+  publicEvent.paypal_me_url = PAYPAL_ME_URL;
+  publicEvent.etransfer_enabled = true;
+  publicEvent.etransfer_email = ETRANSFER_EMAIL;
 
   renderEventBanner();
   syncAvailability();
