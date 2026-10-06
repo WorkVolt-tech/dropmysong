@@ -142,10 +142,19 @@ async function loadEvents(preferredEventId = null) {
     return;
   }
   events = data || [];
-  const target = preferredEventId
-    ? events.find(item => item.id === preferredEventId)
-    : events.find(item => item.id === activeEvent?.id) || events.find(item => item.is_active) || events[0] || null;
+  archiveSupported = !events.length || Object.prototype.hasOwnProperty.call(events[0], 'archived_at');
+
+  const availableEvents = events.filter(item => !item.archived_at);
+  const preferred = preferredEventId ? availableEvents.find(item => item.id === preferredEventId) : null;
+  const target = preferred
+    || availableEvents.find(item => item.id === activeEvent?.id)
+    || availableEvents.find(item => item.is_active)
+    || availableEvents[0]
+    || null;
+
   renderEvents();
+  renderAnalyticsEventOptions();
+  renderArchivedEvents();
   await activateEvent(target?.id || null);
 }
 
@@ -861,12 +870,13 @@ eventForm.addEventListener('submit', async event => {
 });
 
 function renderEvents() {
-  if (!events.length) {
+  const visibleEvents = events.filter(event => !event.archived_at);
+  if (!visibleEvents.length) {
     eventsList.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.createToStart'))}</div>`;
     return;
   }
   const locale = getLanguage() === 'fr' ? 'fr-CA' : 'en-CA';
-  eventsList.innerHTML = events.map(event => `
+  eventsList.innerHTML = visibleEvents.map(event => `
     <div class="event-item ${activeEvent?.id === event.id ? 'selected' : ''}">
       <div>
         <div class="event-title-line">
@@ -879,12 +889,14 @@ function renderEvents() {
         <button class="secondary-button" data-select-event="${event.id}">${escapeHtml(t('dashboard.open'))}</button>
         <button class="secondary-button" data-show-qr="${event.id}">${escapeHtml(t('dashboard.qr'))}</button>
         ${event.is_active ? '' : `<button class="ghost-button" data-activate-event="${event.id}">${escapeHtml(t('dashboard.makeActive'))}</button>`}
+        ${archiveSupported ? `<button class="ghost-button archive-event-button" data-archive-event="${event.id}">${escapeHtml(t('analytics.archiveEvent'))}</button>` : ''}
       </div>
     </div>`).join('');
 
   eventsList.querySelectorAll('[data-select-event]').forEach(button => button.addEventListener('click', () => openEvent(button.dataset.selectEvent)));
   eventsList.querySelectorAll('[data-show-qr]').forEach(button => button.addEventListener('click', () => openQrModal(button.dataset.showQr)));
   eventsList.querySelectorAll('[data-activate-event]').forEach(button => button.addEventListener('click', () => makeEventActive(button.dataset.activateEvent)));
+  eventsList.querySelectorAll('[data-archive-event]').forEach(button => button.addEventListener('click', () => archiveEvent(button.dataset.archiveEvent)));
 }
 
 async function makeEventActive(id) {
