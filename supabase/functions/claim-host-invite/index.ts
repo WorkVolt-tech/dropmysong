@@ -23,39 +23,43 @@ async function sha256Hex(value: string) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function json(body: unknown, status = 200) {
+  return Response.json(body, {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
 export default {
   async fetch(req: Request) {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-    if (req.method !== 'POST') {
-      return Response.json({ error: 'Method not allowed' }, { status: 405, headers: corsHeaders });
-    }
+    if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const publishableKey = getDefaultKey('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY');
     const secretKey = getDefaultKey('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
-    const authHeader = req.headers.get('Authorization') || '';
 
-    if (!supabaseUrl || !publishableKey || !secretKey) {
-      return Response.json({ error: 'Host invite service is not configured' }, { status: 500, headers: corsHeaders });
+    if (!supabaseUrl || !secretKey) {
+      return json({ error: 'Host QR service is not configured' }, 500);
     }
 
-    const userClient = createClient(supabaseUrl, publishableKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
+    let body: {
+      token?: string;
+      action?: string;
+      request_id?: string;
+      host_name?: string;
+    } = {};
 
-    const { data: userData, error: userError } = await userClient.auth.getUser();
-    const user = userData.user;
-    if (userError || !user || !user.email) {
-      return Response.json({ error: 'Sign in before claiming host access' }, { status: 401, headers: corsHeaders });
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid request body' }, 400);
     }
-
-    let body: { token?: string } = {};
-    try { body = await req.json(); } catch {}
 
     const token = body.token?.trim() || '';
+    const action = body.action?.trim() || 'bootstrap';
+
     if (token.length < 20 || token.length > 200) {
-      return Response.json({ error: 'Invalid host invite' }, { status: 400, headers: corsHeaders });
+      return json({ error: 'Invalid host invite' }, 400);
     }
 
     const admin = createClient(supabaseUrl, secretKey, {
@@ -65,83 +69,105 @@ export default {
     const tokenHash = await sha256Hex(token);
     const { data: invite, error: inviteError } = await admin
       .from('host_invites')
-      .select('id,event_id,event_name,event_slug,expires_at,claimed_at,claimed_by,claimed_email')
+      .select('id,event_id,event_name,event_slug,expires_at')
       .eq('token_hash', tokenHash)
       .maybeSingle();
 
-    if (inviteError) {
-      return Response.json({ error: inviteError.message }, { status: 500, headers: corsHeaders });
-    }
-    if (!invite) {
-      return Response.json({ error: 'Host invite not found' }, { status: 404, headers: corsHeaders });
-    }
+    if (inviteError) return json({ error: inviteError.message }, 500);
+    if (!invite) return json({ error: 'Host invite not found' }, 404);
+
     if (new Date(invite.expires_at).getTime() <= Date.now()) {
-      return Response.json({ error: 'This host invite has expired' }, { status: 410, headers: corsHeaders });
+      return json({ error: 'This host QR has expired' }, 410);
     }
 
-    const email = user.email.toLowerCase();
+    if (action === 'bootstrap') {
+      return json({
+        event_id: invite.event_id,
+        event_name: invite.event_name,
+        event_slug: invite.event_slug,
+        expires_at: invite.expires_at,
+        multi_host: true,
+      });
+    }
 
-    if (invite.claimed_at) {
-      const claimedEmail = String(invite.claimed_email || '').toLowerCase();
-      const sameHost = invite.claimed_by === user.id || claimedEmail === email;
-      if (!sameHost) {
-        return Response.json({ error: 'This host invite has already been used' }, { status: 410, headers: corsHeaders });
+    if (action === 'queue') {
+      const [{ data: requests, error: requestError }, { data: calls, error: callsError }] = await Promise.all([
+        admin
+          .from('song_requests')
+          .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at')
+          .eq('event_id', invite.event_id)
+          .in('status', ['pending', 'accepted', 'playing', 'cant_find'])
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true }),
+        admin
+          .from('host_calls')
+          .select('request_id,called_at,host_email')
+          .eq('event_id', invite.event_id),
+      ]);
+
+      if (requestError) return json({ error: requestError.message }, 500);
+      if (callsError) return json({ error: callsError.message }, 500);
+
+      return json({
+        event_id: invite.event_id,
+        event_name: invite.event_name,
+        event_slug: invite.event_slug,
+        expires_at: invite.expires_at,
+        requests: requests || [],
+        calls: calls || [],
+      });
+    }
+
+    if (action === 'mark_called') {
+      const requestId = body.request_id?.trim() || '';
+      const hostName = (body.host_name?.trim() || 'Host').slice(0, 80);
+
+      if (!requestId) return json({ error: 'request_id is required' }, 400);
+
+      const { data: requestRow, error: requestError } = await admin
+        .from('song_requests')
+        .select('id,event_id')
+        .eq('id', requestId)
+        .eq('event_id', invite.event_id)
+        .maybeSingle();
+
+      if (requestError) return json({ error: requestError.message }, 500);
+      if (!requestRow) return json({ error: 'Request not found for this event' }, 404);
+
+      const { data: existing } = await admin
+        .from('host_calls')
+        .select('request_id,called_at,host_email')
+        .eq('request_id', requestId)
+        .maybeSingle();
+
+      if (existing) return json({ called: true, call: existing });
+
+      const { data: call, error: callError } = await admin
+        .from('host_calls')
+        .insert({
+          request_id: requestId,
+          event_id: invite.event_id,
+          host_email: hostName,
+        })
+        .select('request_id,called_at,host_email')
+        .single();
+
+      if (callError && callError.code !== '23505') {
+        return json({ error: callError.message }, 500);
       }
 
-      return Response.json({
-        claimed: true,
-        event_id: invite.event_id,
-        event_name: invite.event_name,
-        event_slug: invite.event_slug,
-      }, { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      if (!call && callError?.code === '23505') {
+        const { data: duplicate } = await admin
+          .from('host_calls')
+          .select('request_id,called_at,host_email')
+          .eq('request_id', requestId)
+          .maybeSingle();
+        return json({ called: true, call: duplicate || null });
+      }
+
+      return json({ called: true, call });
     }
 
-    const claimedAt = new Date().toISOString();
-    const { data: claimedInvite, error: claimError } = await admin
-      .from('host_invites')
-      .update({
-        claimed_at: claimedAt,
-        claimed_by: user.id,
-        claimed_email: email,
-      })
-      .eq('id', invite.id)
-      .is('claimed_at', null)
-      .select('id')
-      .maybeSingle();
-
-    if (claimError) {
-      return Response.json({ error: claimError.message }, { status: 500, headers: corsHeaders });
-    }
-    if (!claimedInvite) {
-      return Response.json({ error: 'This host invite has already been used' }, { status: 410, headers: corsHeaders });
-    }
-
-    const defaultName = email.split('@')[0] || 'Host';
-    const { error: assignmentError } = await admin
-      .from('event_hosts')
-      .upsert({
-        event_id: invite.event_id,
-        host_email: email,
-        display_name: defaultName,
-        event_name: invite.event_name,
-        event_slug: invite.event_slug,
-      }, { onConflict: 'event_id,host_email' });
-
-    if (assignmentError) {
-      await admin
-        .from('host_invites')
-        .update({ claimed_at: null, claimed_by: null, claimed_email: null })
-        .eq('id', invite.id)
-        .eq('claimed_by', user.id);
-
-      return Response.json({ error: assignmentError.message }, { status: 500, headers: corsHeaders });
-    }
-
-    return Response.json({
-      claimed: true,
-      event_id: invite.event_id,
-      event_name: invite.event_name,
-      event_slug: invite.event_slug,
-    }, { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    return json({ error: 'Unknown action' }, 400);
   },
 };
