@@ -40,6 +40,14 @@ const playedCount = document.querySelector('#playedCount');
 const karaokePlayedList = document.querySelector('#karaokePlayedList');
 const karaokePlayedCount = document.querySelector('#karaokePlayedCount');
 const openKaraokePlayer = document.querySelector('#openKaraokePlayer');
+const youtubeSearchModal = document.querySelector('#youtubeSearchModal');
+const closeYoutubeSearch = document.querySelector('#closeYoutubeSearch');
+const youtubeSearchRequest = document.querySelector('#youtubeSearchRequest');
+const youtubeSearchForm = document.querySelector('#youtubeSearchForm');
+const youtubeSearchQuery = document.querySelector('#youtubeSearchQuery');
+const youtubeSearchSubmit = document.querySelector('#youtubeSearchSubmit');
+const youtubeSearchNotice = document.querySelector('#youtubeSearchNotice');
+const youtubeSearchResults = document.querySelector('#youtubeSearchResults');
 const eventForm = document.querySelector('#eventForm');
 const eventsList = document.querySelector('#eventsList');
 const paymentSettingsForm = document.querySelector('#paymentSettingsForm');
@@ -97,6 +105,7 @@ let queueReorderInProgress = false;
 let analyticsEventId = null;
 let analyticsRows = [];
 let archiveSupported = true;
+let activeYoutubeRequestId = null;
 
 initI18n();
 
@@ -341,39 +350,209 @@ function youtubeVideoId(value = '') {
   }
 }
 
+function showYoutubeSearchNotice(text, type = 'error') {
+  youtubeSearchNotice.textContent = text;
+  youtubeSearchNotice.className = `notice ${type}`;
+}
+
+function clearYoutubeSearchNotice() {
+  youtubeSearchNotice.classList.add('hidden');
+  youtubeSearchNotice.textContent = '';
+}
+
+function closeYoutubeSearchModal() {
+  youtubeSearchModal.classList.add('hidden');
+  youtubeSearchResults.innerHTML = '';
+  clearYoutubeSearchNotice();
+  activeYoutubeRequestId = null;
+}
+
+function formatYoutubeDuration(iso = '') {
+  const match = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!match) return '';
+  const hours = Number(match[1] || 0);
+  const minutes = Number(match[2] || 0);
+  const seconds = Number(match[3] || 0);
+  const mm = hours ? String(minutes).padStart(2, '0') : String(minutes);
+  const ss = String(seconds).padStart(2, '0');
+  return hours ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function renderYoutubeResults(results = []) {
+  if (!results.length) {
+    youtubeSearchResults.innerHTML = `<div class="empty-state">${escapeHtml(t('dashboard.youtubeNoResults'))}</div>`;
+    return;
+  }
+
+  youtubeSearchResults.innerHTML = results.map(item => {
+    const duration = formatYoutubeDuration(item.duration);
+    return `
+      <article class="youtube-result-card" data-youtube-result="${escapeHtml(item.video_id)}">
+        <button class="youtube-result-thumb" type="button" data-youtube-preview="${escapeHtml(item.video_id)}" aria-label="${escapeHtml(t('dashboard.previewYoutube'))}">
+          <img src="${escapeHtml(item.thumbnail || '')}" alt="" loading="lazy" />
+          <span>▶</span>
+          ${duration ? `<small>${escapeHtml(duration)}</small>` : ''}
+        </button>
+        <div class="youtube-result-copy">
+          <div class="youtube-result-badges">
+            <span class="request-meta-chip confirmed">✓ ${escapeHtml(t('dashboard.youtubeValidated'))}</span>
+          </div>
+          <h3>${escapeHtml(item.title || 'YouTube karaoke')}</h3>
+          <p class="muted">${escapeHtml(item.channel || 'YouTube')}</p>
+          <div class="youtube-result-actions">
+            <button class="action-button" type="button" data-youtube-preview="${escapeHtml(item.video_id)}">▶ ${escapeHtml(t('dashboard.previewYoutube'))}</button>
+            <button class="action-button primary" type="button" data-youtube-use="${escapeHtml(item.url)}">${escapeHtml(t('dashboard.useThisVersion'))}</button>
+          </div>
+          <div class="youtube-result-preview hidden" data-youtube-preview-slot="${escapeHtml(item.video_id)}"></div>
+        </div>
+      </article>`;
+  }).join('');
+
+  youtubeSearchResults.querySelectorAll('[data-youtube-preview]').forEach(button => {
+    button.addEventListener('click', () => {
+      const videoId = button.dataset.youtubePreview;
+      const slot = youtubeSearchResults.querySelector(`[data-youtube-preview-slot="${CSS.escape(videoId)}"]`);
+      if (!slot) return;
+      const alreadyOpen = !slot.classList.contains('hidden');
+      youtubeSearchResults.querySelectorAll('.youtube-result-preview').forEach(item => {
+        item.classList.add('hidden');
+        item.innerHTML = '';
+      });
+      if (alreadyOpen) return;
+      slot.innerHTML = `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}?rel=0&playsinline=1" title="YouTube karaoke preview" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+      slot.classList.remove('hidden');
+    });
+  });
+
+  youtubeSearchResults.querySelectorAll('[data-youtube-use]').forEach(button => {
+    button.addEventListener('click', async () => {
+      if (!activeYoutubeRequestId) return;
+      button.disabled = true;
+      const saved = await saveKaraokeVideo(activeYoutubeRequestId, button.dataset.youtubeUse);
+      if (saved) closeYoutubeSearchModal();
+      else button.disabled = false;
+    });
+  });
+}
+
+async function runYoutubeSearch(query) {
+  clearYoutubeSearchNotice();
+  youtubeSearchResults.innerHTML = `<div class="youtube-search-loading">${escapeHtml(t('dashboard.youtubeSearching'))}</div>`;
+  youtubeSearchSubmit.disabled = true;
+
+  const { data, error } = await supabase.functions.invoke('youtube-search', {
+    body: { action: 'search', query },
+  });
+
+  youtubeSearchSubmit.disabled = false;
+
+  if (error || !data) {
+    youtubeSearchResults.innerHTML = '';
+    showYoutubeSearchNotice(error?.message || t('dashboard.youtubeSearchFailed'), 'error');
+    return;
+  }
+  if (data.error) {
+    youtubeSearchResults.innerHTML = '';
+    showYoutubeSearchNotice(data.error, 'error');
+    return;
+  }
+
+  renderYoutubeResults(data.results || []);
+}
+
 function searchYoutubeKaraoke(id) {
   const row = requests.find(item => item.id === id);
   if (!row) return;
-  const query = encodeURIComponent(`${row.artist} ${row.song} karaoke`);
-  window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener');
+
+  activeYoutubeRequestId = id;
+  const query = `${row.artist} ${row.song} karaoke`.trim();
+  youtubeSearchRequest.textContent = `${row.requester_name || t('request.singer')} · ${row.artist} — ${row.song}`;
+  youtubeSearchQuery.value = query;
+  youtubeSearchResults.innerHTML = '';
+  clearYoutubeSearchNotice();
+  youtubeSearchModal.classList.remove('hidden');
+  youtubeSearchQuery.focus();
+  runYoutubeSearch(query);
 }
 
-async function setKaraokeVideo(id) {
-  const row = requests.find(item => item.id === id);
-  if (!row) return;
-  const current = row.karaoke_video_url || (youtubeVideoId(row.song_url) ? row.song_url : '');
-  const value = window.prompt(t('dashboard.pasteYoutubeUrl'), current || '');
-  if (value === null) return;
-  const url = value.trim();
-  if (url && !youtubeVideoId(url)) {
-    showDashboardNotice(t('dashboard.youtubeUrlInvalid'), 'error');
-    return;
+async function validateYoutubeVideo(url) {
+  const videoId = youtubeVideoId(url);
+  if (!videoId) return { valid: false, error: t('dashboard.youtubeUrlInvalid') };
+
+  const { data, error } = await supabase.functions.invoke('youtube-search', {
+    body: { action: 'validate', video_id: videoId },
+  });
+
+  if (error || !data) {
+    return { valid: false, error: error?.message || t('dashboard.youtubeValidationFailed') };
   }
+  if (!data.valid || !data.embeddable) {
+    return { valid: false, error: data.error || t('dashboard.youtubeNotEmbeddable') };
+  }
+
+  return { valid: true, video: data.video };
+}
+
+async function saveKaraokeVideo(id, url) {
   const { error } = await supabase
     .from('song_requests')
     .update({ karaoke_video_url: url || null, updated_at: new Date().toISOString() })
     .eq('id', id);
+
   if (error) {
     if (/karaoke_video_url/i.test(error.message || '')) {
       showDashboardNotice(t('dashboard.karaokeUpgradeRequired'), 'error');
     } else {
       showDashboardNotice(error.message, 'error');
     }
-    return;
+    return false;
   }
+
   showDashboardNotice(url ? t('dashboard.youtubeVideoSaved') : t('dashboard.youtubeVideoRemoved'), 'success');
   await loadRequests();
+  return true;
 }
+
+async function setKaraokeVideo(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row) return;
+
+  const current = row.karaoke_video_url || (youtubeVideoId(row.song_url) ? row.song_url : '');
+  const value = window.prompt(t('dashboard.pasteYoutubeUrl'), current || '');
+  if (value === null) return;
+
+  const url = value.trim();
+  if (!url) {
+    await saveKaraokeVideo(id, null);
+    return;
+  }
+
+  showDashboardNotice(t('dashboard.youtubeValidating'));
+  const validation = await validateYoutubeVideo(url);
+  if (!validation.valid) {
+    showDashboardNotice(validation.error || t('dashboard.youtubeNotEmbeddable'), 'error');
+    return;
+  }
+
+  await saveKaraokeVideo(id, validation.video?.url || url);
+}
+
+youtubeSearchForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const query = youtubeSearchQuery.value.trim();
+  if (!query) return;
+  runYoutubeSearch(query);
+});
+
+closeYoutubeSearch.addEventListener('click', closeYoutubeSearchModal);
+youtubeSearchModal.addEventListener('click', event => {
+  if (event.target === youtubeSearchModal) closeYoutubeSearchModal();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !youtubeSearchModal.classList.contains('hidden')) {
+    closeYoutubeSearchModal();
+  }
+});
 
 function requestCard(row, index, type, canReorder = false) {
   const source = type === 'karaoke' ? karaokeRequests() : songRequests();
