@@ -2192,3 +2192,139 @@ select:hover {
     font-size: .78rem;
   }
 }
+
+
+/* DJ dashboard — in-app YouTube karaoke search */
+.youtube-search-modal-card {
+  width: min(980px, calc(100vw - 28px));
+  max-height: min(860px, calc(100vh - 28px));
+  overflow: auto;
+}
+.youtube-search-request {
+  margin: -2px 0 14px;
+  font-weight: 750;
+}
+.youtube-search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+.youtube-search-form input {
+  min-height: 46px;
+}
+.youtube-search-form .primary-button {
+  min-height: 46px;
+  white-space: nowrap;
+}
+.youtube-search-note {
+  margin: 10px 0 14px;
+  color: #8497ae;
+  font-size: .8rem;
+}
+.youtube-search-results {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.youtube-search-loading {
+  padding: 30px 16px;
+  text-align: center;
+  color: #9eb2c8;
+  border: 1px dashed rgba(98,146,210,.2);
+  border-radius: 16px;
+  background: rgba(8,14,24,.55);
+}
+.youtube-result-card {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid rgba(100,145,205,.18);
+  border-radius: 17px;
+  background: linear-gradient(180deg, rgba(12,20,34,.95), rgba(7,12,21,.95));
+}
+.youtube-result-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  background: #000;
+  cursor: pointer;
+}
+.youtube-result-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.youtube-result-thumb > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  color: #fff;
+  text-shadow: 0 3px 18px rgba(0,0,0,.9);
+  background: linear-gradient(180deg, transparent, rgba(0,0,0,.13));
+}
+.youtube-result-thumb > small {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  padding: 3px 6px;
+  border-radius: 6px;
+  color: #fff;
+  background: rgba(0,0,0,.82);
+  font-size: .7rem;
+  font-weight: 800;
+}
+.youtube-result-copy {
+  min-width: 0;
+  align-self: center;
+}
+.youtube-result-copy h3 {
+  margin: 7px 0 4px;
+  font-size: 1.04rem;
+  line-height: 1.35;
+}
+.youtube-result-copy p {
+  margin: 0;
+}
+.youtube-result-badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.youtube-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.youtube-result-preview {
+  margin-top: 12px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+.youtube-result-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .youtube-search-form {
+    grid-template-columns: 1fr;
+  }
+  .youtube-result-card {
+    grid-template-columns: 1fr;
+  }
+}
