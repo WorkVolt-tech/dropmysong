@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#03050a" />
+  <title>Drop My Song — Karaoke TV</title>
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body class="karaoke-tv-body">
+  <main class="karaoke-tv-shell">
+    <header class="karaoke-tv-header">
+      <img src="./assets/drop-my-song-logo.png" alt="Drop My Song by DJ Maxo" />
+      <div>
+        <p class="eyebrow">KARAOKE TV</p>
+        <h1 id="karaokeEventName">Drop My Song Karaoke</h1>
+      </div>
+      <button id="karaokeFullscreen" class="secondary-button karaoke-fullscreen-button" type="button">⛶ Fullscreen</button>
+    </header>
+
+    <section id="karaokeTvNotice" class="notice hidden" aria-live="polite"></section>
+
+    <section class="karaoke-tv-stage">
+      <div class="karaoke-video-frame">
+        <div id="karaokeVideoEmpty" class="karaoke-tv-empty">
+          <span class="karaoke-tv-mic">🎤</span>
+          <p class="eyebrow">WAITING FOR THE NEXT SINGER</p>
+          <h2>Ready when you are.</h2>
+          <p>The karaoke video will appear here automatically when DJ Maxo calls the next singer.</p>
+        </div>
+        <iframe
+          id="karaokeYoutubePlayer"
+          class="hidden"
+          title="YouTube karaoke player"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"></iframe>
+      </div>
+
+      <div class="karaoke-tv-info">
+        <div class="karaoke-now-singing">
+          <p class="eyebrow">NOW SINGING</p>
+          <h2 id="karaokeSingerName">—</h2>
+          <p id="karaokeSongTitle" class="karaoke-tv-song">Waiting for a karaoke request…</p>
+          <p id="karaokeVideoHint" class="muted"></p>
+        </div>
+        <aside class="karaoke-next-singer">
+          <p class="eyebrow">NEXT UP</p>
+          <strong id="karaokeNextSinger">—</strong>
+          <span id="karaokeNextSong" class="muted">Queue is waiting.</span>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/karaoke-player.js"></script>
+</body>
+</html>
