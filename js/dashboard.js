@@ -39,6 +39,7 @@ const playedList = document.querySelector('#playedList');
 const playedCount = document.querySelector('#playedCount');
 const karaokePlayedList = document.querySelector('#karaokePlayedList');
 const karaokePlayedCount = document.querySelector('#karaokePlayedCount');
+const openKaraokePlayer = document.querySelector('#openKaraokePlayer');
 const eventForm = document.querySelector('#eventForm');
 const eventsList = document.querySelector('#eventsList');
 const paymentSettingsForm = document.querySelector('#paymentSettingsForm');
@@ -310,6 +311,12 @@ function bindRequestActions(container, type, canReorder = false) {
   container.querySelectorAll('[data-action]').forEach(button => {
     button.addEventListener('click', () => updateStatus(button.dataset.id, button.dataset.action));
   });
+  container.querySelectorAll('[data-youtube-search]').forEach(button => {
+    button.addEventListener('click', () => searchYoutubeKaraoke(button.dataset.youtubeSearch));
+  });
+  container.querySelectorAll('[data-karaoke-video]').forEach(button => {
+    button.addEventListener('click', () => setKaraokeVideo(button.dataset.karaokeVideo));
+  });
   container.querySelectorAll('[data-confirm-payment]').forEach(button => {
     button.addEventListener('click', () => confirmPayment(button.dataset.confirmPayment));
   });
@@ -317,6 +324,55 @@ function bindRequestActions(container, type, canReorder = false) {
     button.addEventListener('click', () => moveRequest(button.dataset.id, type, Number(button.dataset.moveRequest)));
   });
   if (canReorder) enableDragReordering(container, type);
+}
+
+function youtubeVideoId(value = '') {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0] || '';
+    if (!['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) return '';
+    if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (['embed', 'shorts', 'live'].includes(parts[0])) return parts[1] || '';
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+function searchYoutubeKaraoke(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row) return;
+  const query = encodeURIComponent(`${row.artist} ${row.song} karaoke`);
+  window.open(`https://www.youtube.com/results?search_query=${query}`, '_blank', 'noopener');
+}
+
+async function setKaraokeVideo(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row) return;
+  const current = row.karaoke_video_url || (youtubeVideoId(row.song_url) ? row.song_url : '');
+  const value = window.prompt(t('dashboard.pasteYoutubeUrl'), current || '');
+  if (value === null) return;
+  const url = value.trim();
+  if (url && !youtubeVideoId(url)) {
+    showDashboardNotice(t('dashboard.youtubeUrlInvalid'), 'error');
+    return;
+  }
+  const { error } = await supabase
+    .from('song_requests')
+    .update({ karaoke_video_url: url || null, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) {
+    if (/karaoke_video_url/i.test(error.message || '')) {
+      showDashboardNotice(t('dashboard.karaokeUpgradeRequired'), 'error');
+    } else {
+      showDashboardNotice(error.message, 'error');
+    }
+    return;
+  }
+  showDashboardNotice(url ? t('dashboard.youtubeVideoSaved') : t('dashboard.youtubeVideoRemoved'), 'success');
+  await loadRequests();
 }
 
 function requestCard(row, index, type, canReorder = false) {
@@ -332,6 +388,7 @@ function requestCard(row, index, type, canReorder = false) {
     ? `<div class="request-media-preview" data-song-preview-url="${escapeHtml(row.song_url)}" data-preview-compact="true" data-preview-title="${escapeHtml(row.song)}" data-preview-subtitle="${escapeHtml(row.artist)}" data-preview-open-label="${escapeHtml(t('dashboard.openSongLink'))}"></div>`
     : '';
   const paymentPending = Number(row.tip_amount || 0) > 0 && row.payment_status === 'pending';
+  const karaokeVideoReady = type === 'karaoke' && !!youtubeVideoId(row.karaoke_video_url || row.song_url || '');
   const paymentConfirmed = Number(row.tip_amount || 0) > 0 && row.payment_status === 'confirmed';
   const methodLabel = row.payment_method === 'etransfer' ? t('dashboard.etransfer') : row.payment_method === 'paypal' ? 'PayPal' : '';
   const personPrefix = type === 'karaoke' ? '🎤 ' : '👤 ';
@@ -392,6 +449,15 @@ function requestCard(row, index, type, canReorder = false) {
       </div>`;
   }
 
+  const karaokeProviderTools = type === 'karaoke' ? `
+    <div class="karaoke-provider-tools">
+      <span class="request-meta-chip ${karaokeVideoReady ? 'confirmed' : 'pending'}">${karaokeVideoReady ? '▶ YouTube ready' : '⚠ YouTube video needed'}</span>
+      <div class="karaoke-provider-actions">
+        <button type="button" class="action-button" data-youtube-search="${row.id}">🔎 ${escapeHtml(t('dashboard.searchYoutube'))}</button>
+        <button type="button" class="action-button ${karaokeVideoReady ? '' : 'primary'}" data-karaoke-video="${row.id}">${escapeHtml(karaokeVideoReady ? t('dashboard.changeYoutubeVideo') : t('dashboard.setYoutubeVideo'))}</button>
+      </div>
+    </div>` : '';
+
   const reorderTools = canReorder ? `
     <div class="queue-order-tools" title="${escapeHtml(t('dashboard.dragToReorder'))}">
       <span class="drag-handle" aria-hidden="true">⋮⋮</span>
@@ -418,6 +484,7 @@ function requestCard(row, index, type, canReorder = false) {
             </div>
           </div>
           ${row.message ? `<p class="request-note">“${escapeHtml(row.message)}”</p>` : ''}
+          ${karaokeProviderTools}
           ${actions}
         </div>
       </div>
@@ -517,6 +584,11 @@ async function updateStatus(id, status) {
 
   if (row.payment_status === 'pending' && ['accepted', 'playing', 'played'].includes(status)) {
     showDashboardNotice(t('dashboard.confirmPaymentFirst'), 'error');
+    return;
+  }
+
+  if ((row.request_type || 'song') === 'karaoke' && status === 'playing' && !youtubeVideoId(row.karaoke_video_url || row.song_url || '')) {
+    showDashboardNotice(t('dashboard.youtubeVideoRequired'), 'error');
     return;
   }
 
@@ -833,6 +905,15 @@ copyKaraokeLink.addEventListener('click', async () => {
   if (!activeEvent) return;
   await copyText(karaokeLinkBox.textContent);
   showDashboardNotice(t('dashboard.linkCopied'), 'success');
+});
+
+openKaraokePlayer.addEventListener('click', () => {
+  if (!activeEvent) {
+    showDashboardNotice(t('dashboard.selectEventForKaraokeTv'), 'error');
+    return;
+  }
+  const url = `./karaoke.html?event=${encodeURIComponent(activeEvent.id)}`;
+  window.open(url, 'dropmysong-karaoke-tv');
 });
 
 async function copyText(text) {
