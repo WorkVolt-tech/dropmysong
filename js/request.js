@@ -71,7 +71,7 @@ let linkPreviewTimer = null;
 let previewSequence = 0;
 let lastAutoArtist = '';
 let lastAutoSong = '';
-let availableTipOptions = [2, 5, 10, 20];
+let availableTipOptions = [5, 10, 15, 20];
 let recentPlayedRows = [];
 let recentPlayedAvailable = false;
 let recentPlayedTimer = null;
@@ -179,9 +179,9 @@ function clearNotice() {
 }
 
 function normalizeTipOptions(value) {
-  const list = Array.isArray(value) ? value : [2, 5, 10, 20];
+  const list = Array.isArray(value) ? value : [5, 10, 15, 20];
   const cleaned = list.map(Number).filter(amount => Number.isFinite(amount) && amount > 0).slice(0, 4);
-  return cleaned.length ? cleaned : [2, 5, 10, 20];
+  return cleaned.length ? cleaned : [5, 10, 15, 20];
 }
 
 function renderTipOptions() {
@@ -458,7 +458,7 @@ async function loadEvent() {
   } else {
     // Safe fallback for an event created before the optional settings existed.
     publicEvent.karaoke_enabled = true;
-    publicEvent.tip_options = [2, 5, 10, 20];
+    publicEvent.tip_options = [5, 10, 15, 20];
   }
 
   // Drop My Song is currently for DJ Maxo, so payment destinations are global
