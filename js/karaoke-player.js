@@ -5,7 +5,10 @@ const eventId = params.get('event') || '';
 
 const eventName = document.querySelector('#karaokeEventName');
 const notice = document.querySelector('#karaokeTvNotice');
-const iframe = document.querySelector('#karaokeYoutubePlayer');
+const playerElement = document.querySelector('#karaokeYoutubePlayer');
+const fallbackPanel = document.querySelector('#karaokeYoutubeFallback');
+const fallbackCopy = document.querySelector('#karaokeYoutubeFallbackCopy');
+const openYoutubeFallback = document.querySelector('#openYoutubeFallback');
 const empty = document.querySelector('#karaokeVideoEmpty');
 const singerName = document.querySelector('#karaokeSingerName');
 const songTitle = document.querySelector('#karaokeSongTitle');
@@ -15,6 +18,10 @@ const nextSong = document.querySelector('#karaokeNextSong');
 const fullscreenButton = document.querySelector('#karaokeFullscreen');
 
 let currentVideoId = '';
+let currentYoutubeUrl = '';
+let youtubePlayer = null;
+let youtubeApiReady = null;
+let directYoutubeWindow = null;
 let realtimeChannel = null;
 let pollingTimer = null;
 
@@ -42,25 +49,114 @@ function youtubeVideoId(value = '') {
   }
 }
 
+function loadYoutubeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (youtubeApiReady) return youtubeApiReady;
+
+  youtubeApiReady = new Promise((resolve, reject) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (typeof previousReady === 'function') previousReady();
+      resolve();
+    };
+
+    const existing = document.querySelector('script[data-dropmysong-youtube-api]');
+    if (!existing) {
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.dataset.dropmysongYoutubeApi = 'true';
+      script.onerror = () => reject(new Error('Could not load the YouTube player API.'));
+      document.head.appendChild(script);
+    }
+  });
+
+  return youtubeApiReady;
+}
+
+function hideFallback() {
+  fallbackPanel.classList.add('hidden');
+}
+
+function showFallback(message = 'The video owner does not allow playback inside other websites.') {
+  fallbackCopy.textContent = message;
+  fallbackPanel.classList.remove('hidden');
+  empty.classList.add('hidden');
+  playerElement.classList.add('hidden');
+}
+
+function closeDirectYoutubeWindow() {
+  if (directYoutubeWindow && !directYoutubeWindow.closed) {
+    try { directYoutubeWindow.close(); } catch {}
+  }
+  directYoutubeWindow = null;
+}
+
 function stopVideo() {
   currentVideoId = '';
-  iframe.src = '';
-  iframe.classList.add('hidden');
+  currentYoutubeUrl = '';
+  hideFallback();
+  closeDirectYoutubeWindow();
+  try {
+    youtubePlayer?.stopVideo?.();
+    youtubePlayer?.destroy?.();
+  } catch {}
+  youtubePlayer = null;
+  playerElement.innerHTML = '';
+  playerElement.classList.add('hidden');
   empty.classList.remove('hidden');
 }
 
-function loadVideo(url) {
+async function loadVideo(url) {
   const videoId = youtubeVideoId(url);
   if (!videoId) {
     stopVideo();
     return false;
   }
-  if (videoId === currentVideoId) return true;
+  if (videoId === currentVideoId && youtubePlayer) return true;
+
+  closeDirectYoutubeWindow();
+  hideFallback();
   currentVideoId = videoId;
-  iframe.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0&playsinline=1&enablejsapi=1`;
-  iframe.classList.remove('hidden');
+  currentYoutubeUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
   empty.classList.add('hidden');
-  return true;
+  playerElement.classList.remove('hidden');
+
+  try {
+    await loadYoutubeApi();
+    try { youtubePlayer?.destroy?.(); } catch {}
+    playerElement.innerHTML = '';
+
+    youtubePlayer = new window.YT.Player(playerElement, {
+      videoId,
+      width: '100%',
+      height: '100%',
+      playerVars: {
+        autoplay: 1,
+        rel: 0,
+        playsinline: 1,
+      },
+      events: {
+        onReady: event => {
+          try { event.target.playVideo(); } catch {}
+        },
+        onError: event => {
+          const code = Number(event.data);
+          if (code === 101 || code === 150) {
+            showFallback('The video owner disabled playback on other websites. Open the real YouTube page instead.');
+          } else if (code === 100) {
+            showFallback('This YouTube video is unavailable. Choose another video or open it directly on YouTube.');
+          } else {
+            showFallback('YouTube could not play this video inside Karaoke TV. You can open it directly on YouTube.');
+          }
+        },
+      },
+    });
+    return true;
+  } catch (error) {
+    showFallback(error?.message || 'YouTube could not load inside Karaoke TV.');
+    return true;
+  }
 }
 
 async function loadEvent() {
@@ -127,7 +223,7 @@ async function refreshStage() {
     const source = current.karaoke_video_url || current.song_url || '';
     const playable = loadVideo(source);
     videoHint.textContent = playable
-      ? 'YouTube karaoke video loaded.'
+      ? 'YouTube karaoke video loaded. If embedding is blocked, use the direct YouTube fallback.'
       : 'No YouTube karaoke video is assigned yet. Set one from the DJ Dashboard.';
   }
 
@@ -150,6 +246,19 @@ function startRealtime() {
   pollingTimer = setInterval(refreshStage, 5000);
 }
 
+openYoutubeFallback.addEventListener('click', () => {
+  if (!currentYoutubeUrl) {
+    showNotice('No YouTube video is assigned to the current singer.');
+    return;
+  }
+  directYoutubeWindow = window.open(currentYoutubeUrl, 'dropmysong-youtube-direct');
+  if (!directYoutubeWindow) {
+    showNotice('The browser blocked the YouTube window. Allow pop-ups for Drop My Song and try again.');
+    return;
+  }
+  showNotice('YouTube opened directly. Put that YouTube player fullscreen. Mark the singer Completed in the DJ Dashboard when finished.', 'success');
+});
+
 fullscreenButton.addEventListener('click', async () => {
   try {
     if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
@@ -164,6 +273,7 @@ document.addEventListener('fullscreenchange', () => {
 });
 
 window.addEventListener('beforeunload', () => {
+  closeDirectYoutubeWindow();
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
   if (pollingTimer) clearInterval(pollingTimer);
 });
