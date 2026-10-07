@@ -374,6 +374,29 @@
     </main>
   </div>
 
+  <section id="youtubeSearchModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="youtubeSearchTitle">
+    <div class="panel youtube-search-modal-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow" data-i18n="dashboard.youtubeSearchEyebrow">YOUTUBE KARAOKE</p>
+          <h2 id="youtubeSearchTitle" data-i18n="dashboard.youtubeSearchTitle">Find a Karaoke Video</h2>
+        </div>
+        <button id="closeYoutubeSearch" class="icon-button" type="button" aria-label="Close">×</button>
+      </div>
+
+      <p id="youtubeSearchRequest" class="muted youtube-search-request"></p>
+
+      <form id="youtubeSearchForm" class="youtube-search-form">
+        <input id="youtubeSearchQuery" type="search" maxlength="180" data-i18n-placeholder="dashboard.youtubeSearchPlaceholder" placeholder="Artist, song, karaoke..." />
+        <button id="youtubeSearchSubmit" class="primary-button" type="submit" data-i18n="dashboard.searchYoutube">Search YouTube</button>
+      </form>
+
+      <p class="youtube-search-note" data-i18n="dashboard.youtubeSearchNote">Results are filtered and validated for playback inside Karaoke TV.</p>
+      <div id="youtubeSearchNotice" class="notice hidden" aria-live="polite"></div>
+      <div id="youtubeSearchResults" class="youtube-search-results"></div>
+    </div>
+  </section>
+
   <section id="qrModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="qrModalTitle">
     <div class="panel qr-modal-card">
       <div class="section-heading">
