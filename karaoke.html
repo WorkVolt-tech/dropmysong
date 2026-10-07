@@ -29,13 +29,17 @@
           <h2>Ready when you are.</h2>
           <p>The karaoke video will appear here automatically when DJ Maxo calls the next singer.</p>
         </div>
-        <iframe
-          id="karaokeYoutubePlayer"
-          class="hidden"
-          title="YouTube karaoke player"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          allowfullscreen
-          referrerpolicy="strict-origin-when-cross-origin"></iframe>
+        <div id="karaokeYoutubePlayer" class="karaoke-youtube-player hidden" aria-label="YouTube karaoke player"></div>
+        <div id="karaokeYoutubeFallback" class="karaoke-youtube-fallback hidden">
+          <div class="karaoke-youtube-fallback-card">
+            <span class="karaoke-tv-mic">🎤</span>
+            <p class="eyebrow">YOUTUBE FALLBACK</p>
+            <h2>This video must play on YouTube.</h2>
+            <p id="karaokeYoutubeFallbackCopy">The video owner does not allow playback inside other websites.</p>
+            <button id="openYoutubeFallback" class="primary-button" type="button">Open on YouTube</button>
+            <small>On YouTube, click fullscreen. When the DJ marks the singer completed, this YouTube window will close and Karaoke TV will return for the next singer.</small>
+          </div>
+        </div>
       </div>
 
       <div class="karaoke-tv-info">
