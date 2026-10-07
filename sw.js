@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v21-auto-paypal';
+const CACHE = 'dropmysong-v22-optional-song-name';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './host.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/register-sw.js',
