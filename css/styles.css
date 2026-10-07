@@ -1936,3 +1936,159 @@ select:hover {
   pointer-events: none;
   cursor: wait;
 }
+
+
+/* Drop My Song — YouTube Karaoke TV */
+.karaoke-tv-launch-card {
+  border-color: rgba(123,44,255,.35) !important;
+  background:
+    radial-gradient(circle at 90% 0%, rgba(208,0,255,.12), transparent 42%),
+    linear-gradient(180deg, rgba(13,19,35,.98), rgba(7,11,20,.98)) !important;
+}
+.karaoke-tv-launch-card h2 { margin: 4px 0 8px; }
+.karaoke-tv-launch-card .primary-button { width: 100%; margin-top: 12px; }
+
+.karaoke-provider-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 4px;
+  padding: 10px;
+  border: 1px solid rgba(123,44,255,.2);
+  border-radius: 12px;
+  background: rgba(123,44,255,.06);
+}
+.karaoke-provider-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.karaoke-tv-body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  color: #f7fbff;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(0,194,255,.12), transparent 28%),
+    radial-gradient(circle at 85% 5%, rgba(165,51,255,.16), transparent 32%),
+    #03050a;
+}
+.karaoke-tv-shell {
+  width: min(1800px, 100%);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: clamp(16px, 2vw, 30px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.karaoke-tv-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 18px;
+}
+.karaoke-tv-header img {
+  width: clamp(130px, 12vw, 210px);
+}
+.karaoke-tv-header h1 {
+  margin: 3px 0 0;
+  font-size: clamp(1.25rem, 2.4vw, 2.2rem);
+}
+.karaoke-fullscreen-button {
+  min-width: 130px;
+}
+.karaoke-tv-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 16px;
+}
+.karaoke-video-frame {
+  position: relative;
+  min-height: min(68vh, 900px);
+  overflow: hidden;
+  border: 1px solid rgba(77,152,255,.23);
+  border-radius: 24px;
+  background: #000;
+  box-shadow: 0 30px 80px rgba(0,0,0,.45), 0 0 50px rgba(87,54,255,.08);
+}
+.karaoke-video-frame iframe {
+  width: 100%;
+  height: 100%;
+  min-height: min(68vh, 900px);
+  border: 0;
+  display: block;
+}
+.karaoke-tv-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  padding: 30px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(123,44,255,.18), transparent 30%),
+    linear-gradient(145deg, #060a12, #020307);
+}
+.karaoke-tv-empty.hidden { display: none; }
+.karaoke-tv-empty h2 {
+  margin: 4px 0 8px;
+  font-size: clamp(2rem, 5vw, 5.5rem);
+  letter-spacing: -.045em;
+}
+.karaoke-tv-empty p:last-child {
+  max-width: 700px;
+  margin: 0 auto;
+  color: #91a3ba;
+  font-size: clamp(1rem, 1.5vw, 1.4rem);
+}
+.karaoke-tv-mic {
+  display: block;
+  margin-bottom: 12px;
+  font-size: clamp(4rem, 8vw, 8rem);
+  filter: drop-shadow(0 0 28px rgba(170,73,255,.32));
+}
+.karaoke-tv-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, .32fr);
+  gap: 14px;
+}
+.karaoke-now-singing,
+.karaoke-next-singer {
+  border: 1px solid rgba(95,139,204,.18);
+  border-radius: 18px;
+  padding: 16px 20px;
+  background: linear-gradient(180deg, rgba(12,19,31,.94), rgba(7,11,18,.94));
+}
+.karaoke-now-singing h2 {
+  margin: 2px 0;
+  font-size: clamp(1.8rem, 3.2vw, 3.7rem);
+}
+.karaoke-tv-song {
+  margin: 3px 0;
+  color: #b9c8da;
+  font-size: clamp(1rem, 1.7vw, 1.55rem);
+}
+.karaoke-next-singer strong,
+.karaoke-next-singer span {
+  display: block;
+}
+.karaoke-next-singer strong {
+  margin: 5px 0;
+  font-size: clamp(1.25rem, 2vw, 2rem);
+}
+
+@media (max-width: 760px) {
+  .karaoke-tv-header {
+    grid-template-columns: 1fr auto;
+  }
+  .karaoke-tv-header img { display: none; }
+  .karaoke-tv-info { grid-template-columns: 1fr; }
+  .karaoke-video-frame,
+  .karaoke-video-frame iframe { min-height: 56vh; }
+}
