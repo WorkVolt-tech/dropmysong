@@ -666,9 +666,9 @@ async function updateEventSetting(field, value, label) {
 }
 
 function normalizeTipOptions(value) {
-  const list = Array.isArray(value) ? value : [2, 5, 10, 20];
+  const list = Array.isArray(value) ? value : [5, 10, 15, 20];
   const cleaned = list.map(Number).filter(amount => Number.isFinite(amount) && amount > 0).slice(0, 4);
-  while (cleaned.length < 4) cleaned.push([2, 5, 10, 20][cleaned.length]);
+  while (cleaned.length < 4) cleaned.push([5, 10, 15, 20][cleaned.length]);
   return cleaned;
 }
 
