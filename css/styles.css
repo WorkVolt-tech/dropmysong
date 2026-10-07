@@ -2149,3 +2149,46 @@ select:hover {
   color: #7f91a8;
   line-height: 1.5;
 }
+
+
+/* Karaoke TV fallback — keep action visible on shorter displays */
+.karaoke-youtube-fallback {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-items: center;
+  justify-items: center;
+}
+.karaoke-youtube-fallback-card {
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.karaoke-youtube-fallback-card .karaoke-tv-mic {
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  margin-bottom: 6px;
+}
+@media (max-height: 850px) {
+  .karaoke-youtube-fallback {
+    padding: 12px;
+  }
+  .karaoke-youtube-fallback-card {
+    padding: 18px 22px;
+  }
+  .karaoke-youtube-fallback-card .karaoke-tv-mic {
+    font-size: 3rem;
+    margin-bottom: 2px;
+  }
+  .karaoke-youtube-fallback-card h2 {
+    margin: 3px 0 6px;
+    font-size: clamp(1.5rem, 3vw, 2.4rem);
+  }
+  .karaoke-youtube-fallback-card p:not(.eyebrow) {
+    margin: 6px 0;
+  }
+  .karaoke-youtube-fallback-card .primary-button {
+    margin: 6px auto 9px;
+  }
+  .karaoke-youtube-fallback-card small {
+    font-size: .78rem;
+  }
+}
