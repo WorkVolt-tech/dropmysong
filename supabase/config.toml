@@ -3,3 +3,6 @@ verify_jwt = false
 
 [functions.paypal-payment]
 verify_jwt = false
+
+[functions.youtube-search]
+verify_jwt = false
