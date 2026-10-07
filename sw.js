@@ -1,7 +1,7 @@
-const CACHE = 'dropmysong-v23-tip-presets';
+const CACHE = 'dropmysong-v24-karaoke-tv';
 const STATIC_ASSETS = [
-  './', './index.html', './dj.html', './host.html', './css/styles.css',
-  './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/register-sw.js',
+  './', './index.html', './dj.html', './host.html', './karaoke.html', './css/styles.css',
+  './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/karaoke-player.js', './js/register-sw.js',
   './assets/drop-my-song-logo.png', './assets/icon-192.png', './assets/icon-512.png'
 ];
 
