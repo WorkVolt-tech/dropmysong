@@ -2397,3 +2397,242 @@ select:hover {
   background: rgba(169,76,255,.14);
   border-color: rgba(169,76,255,.32);
 }
+
+
+/* Karaoke TV — adaptive full-screen layout */
+.karaoke-tv-body {
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.karaoke-tv-shell {
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: clamp(10px, 1.35vw, 24px);
+  gap: clamp(8px, 1vh, 14px);
+}
+
+.karaoke-tv-header {
+  flex: 0 0 auto;
+  min-height: 58px;
+}
+
+.karaoke-tv-header img {
+  width: clamp(105px, 9vw, 165px);
+  max-height: 72px;
+  object-fit: contain;
+}
+
+.karaoke-tv-header h1 {
+  font-size: clamp(1.05rem, 1.7vw, 1.75rem);
+}
+
+.karaoke-tv-stage {
+  min-height: 0;
+  height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: clamp(8px, 1vh, 12px);
+}
+
+.karaoke-tv-info {
+  grid-row: 1;
+  grid-template-columns: minmax(0, 1.7fr) minmax(230px, .7fr);
+  gap: 10px;
+}
+
+.karaoke-now-singing,
+.karaoke-next-singer {
+  min-height: 78px;
+  padding: 10px 16px;
+  border-radius: 15px;
+}
+
+.karaoke-now-singing .eyebrow,
+.karaoke-next-singer .eyebrow {
+  margin-bottom: 5px;
+}
+
+.karaoke-tv-person-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2vw, 28px);
+  min-width: 0;
+}
+
+.karaoke-now-singing h2 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: clamp(1.6rem, 2.6vw, 3rem);
+  line-height: 1;
+}
+
+.karaoke-tv-track-copy {
+  min-width: 0;
+}
+
+.karaoke-tv-song {
+  margin: 0;
+  font-size: clamp(.95rem, 1.35vw, 1.35rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#karaokeVideoHint {
+  margin: 3px 0 0;
+  font-size: clamp(.72rem, .9vw, .92rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.karaoke-next-singer strong {
+  margin: 2px 0 1px;
+  font-size: clamp(1.15rem, 1.65vw, 1.7rem);
+  line-height: 1.05;
+}
+
+.karaoke-next-singer span {
+  font-size: clamp(.75rem, .95vw, .95rem);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.karaoke-video-frame {
+  grid-row: 2;
+  min-height: 0;
+  height: 100%;
+  border-radius: clamp(14px, 1.4vw, 22px);
+}
+
+.karaoke-video-frame iframe,
+.karaoke-youtube-player,
+.karaoke-youtube-player iframe {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.karaoke-tv-empty {
+  padding: clamp(16px, 3vh, 30px);
+}
+
+.karaoke-tv-empty .karaoke-tv-mic {
+  font-size: clamp(3rem, 7vh, 6rem);
+  margin-bottom: 4px;
+}
+
+.karaoke-tv-empty h2 {
+  font-size: clamp(2rem, 5.2vh, 4.6rem);
+}
+
+.karaoke-tv-empty p:last-child {
+  font-size: clamp(.9rem, 1.6vh, 1.25rem);
+}
+
+@media (max-aspect-ratio: 4/3), (max-width: 900px) {
+  .karaoke-tv-shell {
+    padding: 10px;
+  }
+
+  .karaoke-tv-header {
+    min-height: 50px;
+  }
+
+  .karaoke-tv-header img {
+    width: clamp(90px, 14vw, 130px);
+  }
+
+  .karaoke-tv-info {
+    grid-template-columns: minmax(0, 1.5fr) minmax(190px, .8fr);
+  }
+
+  .karaoke-now-singing,
+  .karaoke-next-singer {
+    min-height: 68px;
+    padding: 8px 12px;
+  }
+
+  .karaoke-tv-person-row {
+    gap: 10px;
+  }
+}
+
+@media (max-width: 680px) {
+  .karaoke-tv-header {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .karaoke-tv-header img {
+    display: block;
+    width: 78px;
+  }
+
+  .karaoke-tv-header .eyebrow {
+    display: none;
+  }
+
+  .karaoke-fullscreen-button {
+    min-width: 0;
+    padding-inline: 10px;
+  }
+
+  .karaoke-tv-info {
+    grid-template-columns: 1fr;
+  }
+
+  .karaoke-next-singer {
+    display: none;
+  }
+
+  .karaoke-tv-person-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .karaoke-tv-song,
+  #karaokeVideoHint {
+    white-space: normal;
+  }
+}
+
+@media (max-height: 700px) {
+  .karaoke-tv-shell {
+    padding-block: 8px;
+  }
+
+  .karaoke-tv-header {
+    min-height: 44px;
+  }
+
+  .karaoke-tv-header img {
+    max-height: 54px;
+  }
+
+  .karaoke-now-singing,
+  .karaoke-next-singer {
+    min-height: 60px;
+    padding-block: 7px;
+  }
+
+  .karaoke-now-singing h2 {
+    font-size: clamp(1.35rem, 3vh, 2.1rem);
+  }
+
+  .karaoke-tv-empty h2 {
+    font-size: clamp(1.8rem, 4.5vh, 3.5rem);
+  }
+}
+
+:fullscreen .karaoke-tv-body,
+:fullscreen .karaoke-tv-shell,
+.karaoke-tv-body:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  min-height: 0;
+}
