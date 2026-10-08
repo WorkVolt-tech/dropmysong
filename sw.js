@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v28-karaoke-cue-play';
+const CACHE = 'dropmysong-v29-request-colors';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './host.html', './karaoke.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/karaoke-player.js', './js/register-sw.js',
