@@ -22,6 +22,24 @@
     <section id="karaokeTvNotice" class="notice hidden" aria-live="polite"></section>
 
     <section class="karaoke-tv-stage">
+      <div class="karaoke-tv-info">
+        <div class="karaoke-now-singing">
+          <p class="eyebrow">NOW SINGING</p>
+          <div class="karaoke-tv-person-row">
+            <h2 id="karaokeSingerName">—</h2>
+            <div class="karaoke-tv-track-copy">
+              <p id="karaokeSongTitle" class="karaoke-tv-song">Waiting for a karaoke request…</p>
+              <p id="karaokeVideoHint" class="muted"></p>
+            </div>
+          </div>
+        </div>
+        <aside class="karaoke-next-singer">
+          <p class="eyebrow">NEXT UP</p>
+          <strong id="karaokeNextSinger">—</strong>
+          <span id="karaokeNextSong" class="muted">Queue is waiting.</span>
+        </aside>
+      </div>
+
       <div class="karaoke-video-frame">
         <div id="karaokeVideoEmpty" class="karaoke-tv-empty">
           <span class="karaoke-tv-mic">🎤</span>
@@ -40,20 +58,6 @@
             <small>On YouTube, click fullscreen. When the DJ marks the singer completed, this YouTube window will close and Karaoke TV will return for the next singer.</small>
           </div>
         </div>
-      </div>
-
-      <div class="karaoke-tv-info">
-        <div class="karaoke-now-singing">
-          <p class="eyebrow">NOW SINGING</p>
-          <h2 id="karaokeSingerName">—</h2>
-          <p id="karaokeSongTitle" class="karaoke-tv-song">Waiting for a karaoke request…</p>
-          <p id="karaokeVideoHint" class="muted"></p>
-        </div>
-        <aside class="karaoke-next-singer">
-          <p class="eyebrow">NEXT UP</p>
-          <strong id="karaokeNextSinger">—</strong>
-          <span id="karaokeNextSong" class="muted">Queue is waiting.</span>
-        </aside>
       </div>
     </section>
   </main>
