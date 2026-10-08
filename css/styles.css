@@ -2814,3 +2814,19 @@ select:hover {
   background: rgba(255,77,109,.11);
   border-color: rgba(255,77,109,.30);
 }
+
+
+/* Karaoke live queue management */
+.karaoke-queue-actions {
+  margin-top: 7px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(129,159,208,.12);
+}
+.karaoke-queue-actions .action-button {
+  background: rgba(8,15,26,.78);
+}
+.karaoke-queue-actions .action-button.danger {
+  color: #ffc0cb;
+  border-color: rgba(255,77,109,.25);
+  background: rgba(255,77,109,.07);
+}
