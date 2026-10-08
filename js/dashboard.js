@@ -446,8 +446,55 @@ function renderYoutubeResults(results = []) {
   });
 }
 
+const YOUTUBE_CACHE_KEY = 'dropmysong-youtube-cache-v1';
+const YOUTUBE_CACHE_TTL = 24 * 60 * 60 * 1000;
+const YOUTUBE_CACHE_MAX = 80;
+
+function youtubeCacheRead() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(YOUTUBE_CACHE_KEY) || '{}');
+    const now = Date.now();
+    const entries = Object.entries(parsed)
+      .filter(([, value]) => value && Number(value.expires_at || 0) > now)
+      .sort((a, b) => Number(b[1].saved_at || 0) - Number(a[1].saved_at || 0))
+      .slice(0, YOUTUBE_CACHE_MAX);
+    const clean = Object.fromEntries(entries);
+    localStorage.setItem(YOUTUBE_CACHE_KEY, JSON.stringify(clean));
+    return clean;
+  } catch {
+    return {};
+  }
+}
+
+function youtubeCacheWrite(cache) {
+  try {
+    const entries = Object.entries(cache)
+      .sort((a, b) => Number(b[1].saved_at || 0) - Number(a[1].saved_at || 0))
+      .slice(0, YOUTUBE_CACHE_MAX);
+    localStorage.setItem(YOUTUBE_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+  } catch {}
+}
+
+function youtubeSearchCacheKey(query) {
+  return `search:${query.trim().toLowerCase().replace(/\s+/g, ' ')}`;
+}
+
+function youtubeValidationCacheKey(videoId) {
+  return `video:${videoId}`;
+}
+
 async function runYoutubeSearch(query) {
   clearYoutubeSearchNotice();
+
+  const cacheKey = youtubeSearchCacheKey(query);
+  const cache = youtubeCacheRead();
+  const cached = cache[cacheKey];
+  if (cached?.results) {
+    renderYoutubeResults(cached.results);
+    showYoutubeSearchNotice(t('dashboard.youtubeCachedResults'), 'success');
+    return;
+  }
+
   youtubeSearchResults.innerHTML = `<div class="youtube-search-loading">${escapeHtml(t('dashboard.youtubeSearching'))}</div>`;
   youtubeSearchSubmit.disabled = true;
 
@@ -468,7 +515,14 @@ async function runYoutubeSearch(query) {
     return;
   }
 
-  renderYoutubeResults(data.results || []);
+  const results = data.results || [];
+  cache[cacheKey] = {
+    results,
+    saved_at: Date.now(),
+    expires_at: Date.now() + YOUTUBE_CACHE_TTL,
+  };
+  youtubeCacheWrite(cache);
+  renderYoutubeResults(results);
 }
 
 function searchYoutubeKaraoke(id) {
@@ -490,6 +544,11 @@ async function validateYoutubeVideo(url) {
   const videoId = youtubeVideoId(url);
   if (!videoId) return { valid: false, error: t('dashboard.youtubeUrlInvalid') };
 
+  const cacheKey = youtubeValidationCacheKey(videoId);
+  const cache = youtubeCacheRead();
+  const cached = cache[cacheKey];
+  if (cached?.validation) return cached.validation;
+
   const { data, error } = await supabase.functions.invoke('youtube-search', {
     body: { action: 'validate', video_id: videoId },
   });
@@ -501,7 +560,14 @@ async function validateYoutubeVideo(url) {
     return { valid: false, error: data.error || t('dashboard.youtubeNotEmbeddable') };
   }
 
-  return { valid: true, video: data.video };
+  const validation = { valid: true, video: data.video };
+  cache[cacheKey] = {
+    validation,
+    saved_at: Date.now(),
+    expires_at: Date.now() + YOUTUBE_CACHE_TTL,
+  };
+  youtubeCacheWrite(cache);
+  return validation;
 }
 
 async function saveKaraokeVideo(id, url) {
