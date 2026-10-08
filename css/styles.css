@@ -2784,3 +2784,33 @@ select:hover {
     min-height: 24px;
   }
 }
+
+
+/* Host dashboard — karaoke track readiness */
+.host-karaoke-readiness {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: .66rem;
+  font-weight: 900;
+  letter-spacing: .025em;
+  white-space: nowrap;
+}
+.host-karaoke-readiness.ready {
+  color: #b9f7dd;
+  background: rgba(54,219,154,.10);
+  border-color: rgba(54,219,154,.28);
+}
+.host-karaoke-readiness.needed {
+  color: #ffe1a0;
+  background: rgba(255,190,73,.10);
+  border-color: rgba(255,190,73,.30);
+}
+.host-call-card.ready .host-karaoke-readiness.needed {
+  color: #ffc1cc;
+  background: rgba(255,77,109,.11);
+  border-color: rgba(255,77,109,.30);
+}
