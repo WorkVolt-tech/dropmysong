@@ -150,6 +150,10 @@
               <h2 data-i18n="dashboard.karaokeTvTitle">TV / Projector</h2>
               <p class="muted" data-i18n="dashboard.karaokeTvCopy">Open the fullscreen karaoke player on the display connected to this computer.</p>
               <button id="openKaraokePlayer" class="primary-button" type="button" data-i18n="dashboard.openKaraokeTv">Open Karaoke TV</button>
+              <div id="karaokeTvConnection" class="karaoke-tv-connection disconnected" aria-live="polite">
+                <span class="karaoke-tv-connection-dot" aria-hidden="true"></span>
+                <span id="karaokeTvConnectionText" data-i18n="dashboard.karaokeTvDisconnected">TV not connected</span>
+              </div>
             </section>
 
             <section class="panel karaoke-preflight-card">
