@@ -2894,3 +2894,33 @@ select:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Karaoke TV connection health */
+.karaoke-tv-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: #8d9db1;
+  font-size: .72rem;
+  font-weight: 800;
+}
+.karaoke-tv-connection-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #6f7c8e;
+  box-shadow: 0 0 0 3px rgba(111,124,142,.08);
+}
+.karaoke-tv-connection.connected {
+  color: #b9f7dd;
+}
+.karaoke-tv-connection.connected .karaoke-tv-connection-dot {
+  background: #36db9a;
+  box-shadow: 0 0 12px rgba(54,219,154,.55);
+}
+.karaoke-tv-connection.disconnected .karaoke-tv-connection-dot {
+  background: #758399;
+}
