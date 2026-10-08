@@ -334,6 +334,9 @@ function bindRequestActions(container, type, canReorder = false) {
   container.querySelectorAll('[data-karaoke-video]').forEach(button => {
     button.addEventListener('click', () => setKaraokeVideo(button.dataset.karaokeVideo));
   });
+  container.querySelectorAll('[data-youtube-recheck]').forEach(button => {
+    button.addEventListener('click', () => recheckKaraokeVideo(button.dataset.youtubeRecheck));
+  });
   container.querySelectorAll('[data-karaoke-play]').forEach(button => {
     button.addEventListener('click', () => sendKaraokeControl('play', button.dataset.karaokePlay));
   });
@@ -540,14 +543,14 @@ function searchYoutubeKaraoke(id) {
   runYoutubeSearch(query);
 }
 
-async function validateYoutubeVideo(url) {
+async function validateYoutubeVideo(url, force = false) {
   const videoId = youtubeVideoId(url);
   if (!videoId) return { valid: false, error: t('dashboard.youtubeUrlInvalid') };
 
   const cacheKey = youtubeValidationCacheKey(videoId);
   const cache = youtubeCacheRead();
   const cached = cache[cacheKey];
-  if (cached?.validation) return cached.validation;
+  if (!force && cached?.validation) return cached.validation;
 
   const { data, error } = await supabase.functions.invoke('youtube-search', {
     body: { action: 'validate', video_id: videoId },
@@ -568,6 +571,26 @@ async function validateYoutubeVideo(url) {
   };
   youtubeCacheWrite(cache);
   return validation;
+}
+
+async function recheckKaraokeVideo(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row) return;
+
+  const url = row.karaoke_video_url || row.song_url || '';
+  if (!youtubeVideoId(url)) {
+    showDashboardNotice(t('dashboard.youtubeVideoRequired'), 'error');
+    return;
+  }
+
+  showDashboardNotice(t('dashboard.youtubeRechecking'));
+  const validation = await validateYoutubeVideo(url, true);
+  if (!validation.valid) {
+    showDashboardNotice(validation.error || t('dashboard.youtubeUnavailableNow'), 'error');
+    return;
+  }
+
+  showDashboardNotice(t('dashboard.youtubeVerifiedReady'), 'success');
 }
 
 async function saveKaraokeVideo(id, url) {
@@ -716,6 +739,7 @@ function requestCard(row, index, type, canReorder = false) {
       <div class="karaoke-provider-actions">
         <button type="button" class="action-button" data-youtube-search="${row.id}">🔎 ${escapeHtml(t('dashboard.searchYoutube'))}</button>
         <button type="button" class="action-button ${karaokeVideoReady ? '' : 'primary'}" data-karaoke-video="${row.id}">${escapeHtml(karaokeVideoReady ? t('dashboard.changeYoutubeVideo') : t('dashboard.setYoutubeVideo'))}</button>
+        ${karaokeVideoReady ? `<button type="button" class="action-button" data-youtube-recheck="${row.id}">✓ ${escapeHtml(t('dashboard.recheckYoutube'))}</button>` : ''}
       </div>
     </div>` : '';
 
@@ -871,9 +895,19 @@ async function completeAndCallNext() {
 
   const next = rows.find(row => row.status === 'accepted') || null;
 
-  if (next && !youtubeVideoId(next.karaoke_video_url || next.song_url || '')) {
-    showDashboardNotice(t('dashboard.nextSingerVideoRequired'), 'error');
-    return;
+  if (next) {
+    const nextSource = next.karaoke_video_url || next.song_url || '';
+    if (!youtubeVideoId(nextSource)) {
+      showDashboardNotice(t('dashboard.nextSingerVideoRequired'), 'error');
+      return;
+    }
+
+    showDashboardNotice(t('dashboard.youtubeRechecking'));
+    const nextValidation = await validateYoutubeVideo(nextSource, true);
+    if (!nextValidation.valid) {
+      showDashboardNotice(nextValidation.error || t('dashboard.nextSingerVideoUnavailable'), 'error');
+      return;
+    }
   }
 
   sendKaraokeControl('stop', current.id);
@@ -945,9 +979,19 @@ async function updateStatus(id, status) {
     return;
   }
 
-  if ((row.request_type || 'song') === 'karaoke' && status === 'playing' && !youtubeVideoId(row.karaoke_video_url || row.song_url || '')) {
-    showDashboardNotice(t('dashboard.youtubeVideoRequired'), 'error');
-    return;
+  if ((row.request_type || 'song') === 'karaoke' && status === 'playing') {
+    const source = row.karaoke_video_url || row.song_url || '';
+    if (!youtubeVideoId(source)) {
+      showDashboardNotice(t('dashboard.youtubeVideoRequired'), 'error');
+      return;
+    }
+
+    showDashboardNotice(t('dashboard.youtubeRechecking'));
+    const validation = await validateYoutubeVideo(source, true);
+    if (!validation.valid) {
+      showDashboardNotice(validation.error || t('dashboard.youtubeUnavailableNow'), 'error');
+      return;
+    }
   }
 
   const payload = { status, updated_at: new Date().toISOString() };
