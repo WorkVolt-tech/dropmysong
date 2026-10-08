@@ -386,7 +386,7 @@ async function loadRequests() {
   if (!activeAssignment) return;
   const { data, error } = await supabase
     .from('song_requests')
-    .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at')
+    .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at,song_url,karaoke_video_url')
     .eq('event_id', activeAssignment.event_id)
     .in('status', ['pending', 'accepted', 'playing', 'cant_find'])
     .order('sort_order', { ascending: true })
@@ -440,12 +440,42 @@ function typeLabel(row) {
   return row.request_type === 'karaoke' ? t('host.karaoke') : t('host.song');
 }
 
+function youtubeVideoId(value = '') {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0] || '';
+    if (!['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) return '';
+    if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (['embed', 'shorts', 'live'].includes(parts[0])) return parts[1] || '';
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+function karaokeTrackReady(row) {
+  if (row.request_type !== 'karaoke') return null;
+  if (typeof row.karaoke_ready === 'boolean') return row.karaoke_ready;
+  return !!youtubeVideoId(row.karaoke_video_url || row.song_url || '');
+}
+
+function karaokeReadinessBadge(row) {
+  const ready = karaokeTrackReady(row);
+  if (ready === null) return '';
+  return ready
+    ? '<span class="host-karaoke-readiness ready">✓ ' + escapeHtml(t('host.karaokeTrackReady')) + '</span>'
+    : '<span class="host-karaoke-readiness needed">⚠ ' + escapeHtml(t('host.karaokeTrackNeeded')) + '</span>';
+}
+
 function renderReadyCard(row) {
   const call = hostCalls.get(row.id);
   return `
     <article class="host-call-card ready">
       <div class="host-call-top">
         <span class="host-type-badge">${escapeHtml(typeLabel(row))}</span>
+        ${karaokeReadinessBadge(row)}
         ${call ? `<span class="host-called-badge">✓ ${escapeHtml(t('host.called'))}</span>` : ''}
       </div>
       <h3>${escapeHtml(requesterLabel(row))}</h3>
@@ -467,6 +497,7 @@ function renderQueueCard(row) {
     <article class="host-call-card">
       <div class="host-call-top">
         <span class="host-type-badge">${escapeHtml(typeLabel(row))}</span>
+        ${karaokeReadinessBadge(row)}
         <span class="status-pill ${row.status}">${escapeHtml(statusText)}</span>
       </div>
       <h3>${escapeHtml(requesterLabel(row))}</h3>
