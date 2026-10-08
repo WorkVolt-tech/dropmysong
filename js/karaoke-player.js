@@ -13,6 +13,12 @@ const empty = document.querySelector('#karaokeVideoEmpty');
 const singerName = document.querySelector('#karaokeSingerName');
 const songTitle = document.querySelector('#karaokeSongTitle');
 const videoHint = document.querySelector('#karaokeVideoHint');
+const stateBadge = document.querySelector('#karaokeStateBadge');
+const playbackOverlay = document.querySelector('#karaokePlaybackOverlay');
+const playbackIcon = document.querySelector('#karaokePlaybackIcon');
+const playbackEyebrow = document.querySelector('#karaokePlaybackEyebrow');
+const playbackTitle = document.querySelector('#karaokePlaybackTitle');
+const playbackCopy = document.querySelector('#karaokePlaybackCopy');
 const nextSinger = document.querySelector('#karaokeNextSinger');
 const nextSong = document.querySelector('#karaokeNextSong');
 const fullscreenButton = document.querySelector('#karaokeFullscreen');
@@ -28,6 +34,87 @@ let currentRequestId = '';
 let youtubePlayerReady = false;
 let pendingPlayRequestId = '';
 const karaokeControlChannel = 'BroadcastChannel' in window ? new BroadcastChannel('dropmysong-karaoke-control') : null;
+
+const tvStates = {
+  waiting: {
+    badge: 'WAITING',
+    hint: '',
+    overlay: false,
+  },
+  called: {
+    badge: 'SINGER CALLED',
+    hint: 'Singer called — waiting for the DJ to press Play.',
+    overlay: true,
+    icon: '🎤',
+    eyebrow: 'SINGER CALLED',
+    title: 'Get in position.',
+    copy: 'The DJ will start the karaoke when you are ready.',
+  },
+  starting: {
+    badge: 'STARTING',
+    hint: 'Starting karaoke…',
+    overlay: true,
+    icon: '▶',
+    eyebrow: 'STARTING',
+    title: 'Here we go…',
+    copy: 'Karaoke is starting now.',
+  },
+  playing: {
+    badge: 'PLAYING',
+    hint: 'Karaoke is playing.',
+    overlay: false,
+  },
+  paused: {
+    badge: 'PAUSED',
+    hint: 'Karaoke paused.',
+    overlay: true,
+    icon: '⏸',
+    eyebrow: 'PAUSED',
+    title: 'Hold on.',
+    copy: 'The DJ will resume the karaoke when ready.',
+  },
+  stopped: {
+    badge: 'READY',
+    hint: 'Karaoke stopped — ready to start again.',
+    overlay: true,
+    icon: '↺',
+    eyebrow: 'READY TO START',
+    title: 'Back at the beginning.',
+    copy: 'Waiting for the DJ to start the karaoke.',
+  },
+  finished: {
+    badge: 'FINISHED',
+    hint: 'Karaoke finished — waiting for the DJ.',
+    overlay: true,
+    icon: '✓',
+    eyebrow: 'SONG FINISHED',
+    title: 'Nice job!',
+    copy: 'The DJ will bring up the next singer.',
+  },
+  fallback: {
+    badge: 'DIRECT YOUTUBE',
+    hint: 'This video must play directly on YouTube.',
+    overlay: false,
+  },
+};
+
+function setTvState(state) {
+  const config = tvStates[state] || tvStates.waiting;
+  stateBadge.textContent = config.badge;
+  stateBadge.className = `karaoke-state-badge ${state}`;
+  videoHint.textContent = config.hint || '';
+
+  if (!config.overlay) {
+    playbackOverlay.classList.add('hidden');
+    return;
+  }
+
+  playbackIcon.textContent = config.icon || '🎤';
+  playbackEyebrow.textContent = config.eyebrow || '';
+  playbackTitle.textContent = config.title || '';
+  playbackCopy.textContent = config.copy || '';
+  playbackOverlay.classList.remove('hidden');
+}
 
 function showNotice(text, type = 'error') {
   notice.textContent = text;
@@ -85,8 +172,10 @@ function hideFallback() {
 function showFallback(message = 'The video owner does not allow playback inside other websites.') {
   fallbackCopy.textContent = message;
   fallbackPanel.classList.remove('hidden');
+  playbackOverlay.classList.add('hidden');
   empty.classList.add('hidden');
   playerElement.classList.add('hidden');
+  setTvState('fallback');
 }
 
 function closeDirectYoutubeWindow() {
@@ -111,7 +200,9 @@ function stopVideo() {
   youtubePlayer = null;
   playerElement.innerHTML = '';
   playerElement.classList.add('hidden');
+  playbackOverlay.classList.add('hidden');
   empty.classList.remove('hidden');
+  setTvState('waiting');
 }
 
 async function loadVideo(url) {
@@ -150,7 +241,18 @@ async function loadVideo(url) {
           if (pendingPlayRequestId && pendingPlayRequestId === currentRequestId) {
             pendingPlayRequestId = '';
             try { event.target.playVideo(); } catch {}
-            videoHint.textContent = 'Karaoke is playing.';
+            setTvState('starting');
+          } else {
+            setTvState('called');
+          }
+        },
+        onStateChange: event => {
+          const state = Number(event.data);
+          if (state === window.YT.PlayerState.PLAYING) setTvState('playing');
+          else if (state === window.YT.PlayerState.PAUSED && currentRequestId) {
+            if (!['stopped', 'finished'].includes(stateBadge.classList[1])) setTvState('paused');
+          } else if (state === window.YT.PlayerState.ENDED) {
+            setTvState('finished');
           }
         },
         onError: event => {
@@ -236,9 +338,11 @@ async function refreshStage() {
     currentRequestId = current.id;
     const source = current.karaoke_video_url || current.song_url || '';
     const playable = await loadVideo(source);
-    videoHint.textContent = playable
-      ? 'Singer called — waiting for the DJ to press Start Karaoke.'
-      : 'No YouTube karaoke video is assigned yet. Set one from the DJ Dashboard.';
+    if (playable) {
+      if (!youtubePlayerReady) setTvState('called');
+    } else {
+      videoHint.textContent = 'No YouTube karaoke video is assigned yet. Set one from the DJ Dashboard.';
+    }
   }
 
   nextSinger.textContent = next?.requester_name || '—';
@@ -252,7 +356,7 @@ function handleKaraokeControl(message) {
   if (!youtubePlayerReady || !youtubePlayer) {
     if (message.action === 'play' || message.action === 'restart') {
       pendingPlayRequestId = message.request_id;
-      videoHint.textContent = message.action === 'restart' ? 'Restarting karaoke…' : 'Starting karaoke…';
+      setTvState('starting');
     }
     return;
   }
@@ -260,27 +364,27 @@ function handleKaraokeControl(message) {
   try {
     if (message.action === 'play') {
       youtubePlayer.playVideo();
-      videoHint.textContent = 'Karaoke is playing.';
+      setTvState('starting');
       return;
     }
 
     if (message.action === 'pause') {
       youtubePlayer.pauseVideo();
-      videoHint.textContent = 'Karaoke paused.';
+      setTvState('paused');
       return;
     }
 
     if (message.action === 'restart') {
       youtubePlayer.seekTo(0, true);
       youtubePlayer.playVideo();
-      videoHint.textContent = 'Karaoke restarted.';
+      setTvState('starting');
       return;
     }
 
     if (message.action === 'stop') {
       youtubePlayer.pauseVideo();
       youtubePlayer.seekTo(0, true);
-      videoHint.textContent = 'Karaoke stopped — ready to start again.';
+      setTvState('stopped');
     }
   } catch {
     if (message.action === 'play' || message.action === 'restart') {
