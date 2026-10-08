@@ -26,7 +26,12 @@
         <div class="karaoke-now-singing">
           <p class="eyebrow">NOW SINGING</p>
           <div class="karaoke-tv-person-row">
-            <h2 id="karaokeSingerName">—</h2>
+            <div class="karaoke-tv-singer-stack">
+              <div class="karaoke-tv-singer-line">
+                <h2 id="karaokeSingerName">—</h2>
+                <span id="karaokeStateBadge" class="karaoke-state-badge waiting">WAITING</span>
+              </div>
+            </div>
             <div class="karaoke-tv-track-copy">
               <p id="karaokeSongTitle" class="karaoke-tv-song">Waiting for a karaoke request…</p>
               <p id="karaokeVideoHint" class="muted"></p>
@@ -48,6 +53,12 @@
           <p>The karaoke video will appear here automatically when DJ Maxo calls the next singer.</p>
         </div>
         <div id="karaokeYoutubePlayer" class="karaoke-youtube-player hidden" aria-label="YouTube karaoke player"></div>
+        <div id="karaokePlaybackOverlay" class="karaoke-playback-overlay hidden" aria-live="polite">
+          <span id="karaokePlaybackIcon">🎤</span>
+          <p id="karaokePlaybackEyebrow" class="eyebrow">SINGER CALLED</p>
+          <h2 id="karaokePlaybackTitle">Get in position.</h2>
+          <p id="karaokePlaybackCopy">The DJ will start the karaoke when you are ready.</p>
+        </div>
         <div id="karaokeYoutubeFallback" class="karaoke-youtube-fallback hidden">
           <div class="karaoke-youtube-fallback-card">
             <span class="karaoke-tv-mic">🎤</span>
