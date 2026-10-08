@@ -654,7 +654,7 @@ function requestCard(row, index, type, canReorder = false) {
     </div>` : '';
 
   return `
-    <article class="request-card ${index === 0 ? 'highlight' : ''} ${type === 'karaoke' ? 'karaoke-card' : ''}" data-request-id="${row.id}" data-request-type="${type}" draggable="${canReorder ? 'true' : 'false'}">
+    <article class="request-card ${index === 0 ? 'highlight' : ''} ${type === 'karaoke' ? 'karaoke-card' : 'song-card'}" data-request-id="${row.id}" data-request-type="${type}" draggable="${canReorder ? 'true' : 'false'}">
       ${reorderTools}
       <div class="request-card-layout ${preview ? 'has-preview' : ''}">
         ${preview}
@@ -663,6 +663,7 @@ function requestCard(row, index, type, canReorder = false) {
             <div class="request-card-title-block">
               <div class="request-card-kicker">
                 <span class="request-number">#${index + 1}</span>
+                <span class="request-type-pill ${type}">${escapeHtml(type === 'karaoke' ? t('dashboard.karaoke') : t('host.song'))}</span>
                 <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
                 <span class="request-time">${escapeHtml(relativeTime(row.created_at, getLanguage()))}</span>
               </div>
