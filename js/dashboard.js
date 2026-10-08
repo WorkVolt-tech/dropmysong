@@ -40,6 +40,13 @@ const playedCount = document.querySelector('#playedCount');
 const karaokePlayedList = document.querySelector('#karaokePlayedList');
 const karaokePlayedCount = document.querySelector('#karaokePlayedCount');
 const openKaraokePlayer = document.querySelector('#openKaraokePlayer');
+const karaokeControlSinger = document.querySelector('#karaokeControlSinger');
+const karaokeControlSong = document.querySelector('#karaokeControlSong');
+const karaokePlayControl = document.querySelector('#karaokePlayControl');
+const karaokePauseControl = document.querySelector('#karaokePauseControl');
+const karaokeRestartControl = document.querySelector('#karaokeRestartControl');
+const karaokeStopControl = document.querySelector('#karaokeStopControl');
+const karaokeNextSingerControl = document.querySelector('#karaokeNextSingerControl');
 const youtubeSearchModal = document.querySelector('#youtubeSearchModal');
 const closeYoutubeSearch = document.querySelector('#closeYoutubeSearch');
 const youtubeSearchRequest = document.querySelector('#youtubeSearchRequest');
@@ -328,7 +335,7 @@ function bindRequestActions(container, type, canReorder = false) {
     button.addEventListener('click', () => setKaraokeVideo(button.dataset.karaokeVideo));
   });
   container.querySelectorAll('[data-karaoke-play]').forEach(button => {
-    button.addEventListener('click', () => startKaraokePlayback(button.dataset.karaokePlay));
+    button.addEventListener('click', () => sendKaraokeControl('play', button.dataset.karaokePlay));
   });
   container.querySelectorAll('[data-confirm-payment]').forEach(button => {
     button.addEventListener('click', () => confirmPayment(button.dataset.confirmPayment));
@@ -754,12 +761,17 @@ function enableDragReordering(container, type) {
   });
 }
 
-function startKaraokePlayback(id) {
-  const row = requests.find(item => item.id === id);
-  if (!row || !activeEvent || row.status !== 'playing') return;
+function sendKaraokeControl(action, requestId = null) {
+  const row = requestId
+    ? requests.find(item => item.id === requestId)
+    : karaokeRequests().find(item => item.status === 'playing');
+  if (!row || !activeEvent || row.status !== 'playing') {
+    showDashboardNotice(t('dashboard.noSingerCalled'), 'error');
+    return;
+  }
 
   const message = {
-    action: 'play',
+    action,
     event_id: activeEvent.id,
     request_id: row.id,
     sent_at: Date.now(),
@@ -771,7 +783,78 @@ function startKaraokePlayback(id) {
     localStorage.removeItem('dropmysong-karaoke-control');
   } catch {}
 
-  showDashboardNotice(t('dashboard.karaokeStarted'), 'success');
+  const noticeKey = {
+    play: 'dashboard.karaokeStarted',
+    pause: 'dashboard.karaokePaused',
+    restart: 'dashboard.karaokeRestarted',
+    stop: 'dashboard.karaokeStopped',
+  }[action];
+
+  if (noticeKey) showDashboardNotice(t(noticeKey), 'success');
+}
+
+async function completeAndCallNext() {
+  if (!activeEvent) return;
+  const rows = karaokeRequests();
+  const current = rows.find(row => row.status === 'playing');
+
+  if (!current) {
+    showDashboardNotice(t('dashboard.noSingerCalled'), 'error');
+    return;
+  }
+
+  const next = rows.find(row => row.status === 'accepted') || null;
+
+  if (next && !youtubeVideoId(next.karaoke_video_url || next.song_url || '')) {
+    showDashboardNotice(t('dashboard.nextSingerVideoRequired'), 'error');
+    return;
+  }
+
+  sendKaraokeControl('stop', current.id);
+
+  const completedAt = new Date().toISOString();
+  const { error: completeError } = await supabase
+    .from('song_requests')
+    .update({
+      status: 'played',
+      played_at: completedAt,
+      updated_at: completedAt,
+    })
+    .eq('id', current.id);
+
+  if (completeError) {
+    showDashboardNotice(completeError.message, 'error');
+    return;
+  }
+
+  await broadcastGuestStatus(current, 'played');
+
+  if (!next) {
+    showDashboardNotice(t('dashboard.karaokeCompletedNoNext'), 'success');
+    await loadRequests();
+    return;
+  }
+
+  const nextAt = new Date().toISOString();
+  const { error: nextError } = await supabase
+    .from('song_requests')
+    .update({
+      status: 'playing',
+      played_at: null,
+      updated_at: nextAt,
+    })
+    .eq('id', next.id);
+
+  if (nextError) {
+    showDashboardNotice(nextError.message, 'error');
+    await loadRequests();
+    return;
+  }
+
+  await broadcastGuestStatus(next, 'playing');
+  await sendKaraokePush(next);
+  showDashboardNotice(t('dashboard.nextSingerCalled', { name: next.requester_name || t('request.singer') }), 'success');
+  await loadRequests();
 }
 
 async function sendKaraokePush(row) {
@@ -886,12 +969,26 @@ function renderSongSideRail() {
 
 function renderKaraokeSideRail() {
   const rows = karaokeRequests();
+  const current = rows.find(row => row.status === 'playing') || null;
   const ready = rows.filter(row => row.status === 'playing');
   karaokeReadyList.innerHTML = ready.length
     ? ready.map(row => `<div class="mini-item karaoke-ready-mini"><strong>🎤 ${escapeHtml(row.requester_name || t('request.singer'))}</strong><span>${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div>`).join('')
     : `<div class="empty-state">${escapeHtml(t('dashboard.noSingerCalled'))}</div>`;
 
   const next = rows.filter(row => row.status === 'accepted').slice(0, 8);
+
+  karaokeControlSinger.textContent = current?.requester_name || t('dashboard.noSingerCalled');
+  karaokeControlSong.textContent = current
+    ? `${current.artist} — ${current.song}`
+    : t('dashboard.callSingerToLoad');
+
+  [karaokePlayControl, karaokePauseControl, karaokeRestartControl, karaokeStopControl, karaokeNextSingerControl]
+    .forEach(button => { button.disabled = !current; });
+
+  karaokeNextSingerControl.textContent = next.length
+    ? t('dashboard.completeNextSinger')
+    : t('dashboard.completeCurrentSinger');
+
   karaokeNextCount.textContent = next.length;
   karaokeNextList.innerHTML = next.length
     ? next.map((row, index) => `<div class="mini-item queue-mini-item"><span class="mini-rank">${index + 1}</span><div><strong>${escapeHtml(row.requester_name || t('request.singer'))}</strong><span class="muted">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</span></div></div>`).join('')
@@ -922,6 +1019,11 @@ requestSearch.addEventListener('input', renderSongRequests);
 statusFilter.addEventListener('change', renderSongRequests);
 karaokeSearch.addEventListener('input', renderKaraokeRequests);
 karaokeStatusFilter.addEventListener('change', renderKaraokeRequests);
+
+document.querySelectorAll('[data-karaoke-global-control]').forEach(button => {
+  button.addEventListener('click', () => sendKaraokeControl(button.dataset.karaokeGlobalControl));
+});
+karaokeNextSingerControl.addEventListener('click', completeAndCallNext);
 
 requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked, t('dashboard.requests')));
 karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
