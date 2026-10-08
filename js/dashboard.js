@@ -106,6 +106,7 @@ let analyticsEventId = null;
 let analyticsRows = [];
 let archiveSupported = true;
 let activeYoutubeRequestId = null;
+const karaokeControlChannel = 'BroadcastChannel' in window ? new BroadcastChannel('dropmysong-karaoke-control') : null;
 
 initI18n();
 
@@ -325,6 +326,9 @@ function bindRequestActions(container, type, canReorder = false) {
   });
   container.querySelectorAll('[data-karaoke-video]').forEach(button => {
     button.addEventListener('click', () => setKaraokeVideo(button.dataset.karaokeVideo));
+  });
+  container.querySelectorAll('[data-karaoke-play]').forEach(button => {
+    button.addEventListener('click', () => startKaraokePlayback(button.dataset.karaokePlay));
   });
   container.querySelectorAll('[data-confirm-payment]').forEach(button => {
     button.addEventListener('click', () => confirmPayment(button.dataset.confirmPayment));
@@ -621,11 +625,16 @@ function requestCard(row, index, type, canReorder = false) {
           <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.markPlayed'))}</button>
         </div>`;
   } else if (row.status === 'playing') {
-    actions = `
-      <div class="request-actions two">
-        <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(type === 'karaoke' ? t('dashboard.completed') : t('dashboard.markPlayed'))}</button>
-        <button class="action-button" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.backQueue'))}</button>
-      </div>`;
+    actions = type === 'karaoke'
+      ? `<div class="request-actions">
+          <button class="action-button primary" type="button" data-karaoke-play="${row.id}">${escapeHtml(t('dashboard.startKaraoke'))}</button>
+          <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.completed'))}</button>
+          <button class="action-button" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.backQueue'))}</button>
+        </div>`
+      : `<div class="request-actions two">
+          <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.markPlayed'))}</button>
+          <button class="action-button" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.backQueue'))}</button>
+        </div>`;
   }
 
   const karaokeProviderTools = type === 'karaoke' ? `
@@ -742,6 +751,26 @@ function enableDragReordering(container, type) {
     const after = event.clientY > rect.top + rect.height / 2;
     container.insertBefore(dragged, after ? target.nextSibling : target);
   });
+}
+
+function startKaraokePlayback(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row || !activeEvent || row.status !== 'playing') return;
+
+  const message = {
+    action: 'play',
+    event_id: activeEvent.id,
+    request_id: row.id,
+    sent_at: Date.now(),
+  };
+
+  try { karaokeControlChannel?.postMessage(message); } catch {}
+  try {
+    localStorage.setItem('dropmysong-karaoke-control', JSON.stringify(message));
+    localStorage.removeItem('dropmysong-karaoke-control');
+  } catch {}
+
+  showDashboardNotice(t('dashboard.karaokeStarted'), 'success');
 }
 
 async function sendKaraokePush(row) {
