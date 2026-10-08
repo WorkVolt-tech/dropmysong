@@ -340,6 +340,15 @@ function bindRequestActions(container, type, canReorder = false) {
   container.querySelectorAll('[data-karaoke-play]').forEach(button => {
     button.addEventListener('click', () => sendKaraokeControl('play', button.dataset.karaokePlay));
   });
+  container.querySelectorAll('[data-karaoke-recall]').forEach(button => {
+    button.addEventListener('click', () => recallSinger(button.dataset.karaokeRecall));
+  });
+  container.querySelectorAll('[data-karaoke-skip]').forEach(button => {
+    button.addEventListener('click', () => moveSingerToEnd(button.dataset.karaokeSkip, false));
+  });
+  container.querySelectorAll('[data-karaoke-noshow]').forEach(button => {
+    button.addEventListener('click', () => moveSingerToEnd(button.dataset.karaokeNoshow, true));
+  });
   container.querySelectorAll('[data-confirm-payment]').forEach(button => {
     button.addEventListener('click', () => confirmPayment(button.dataset.confirmPayment));
   });
@@ -726,6 +735,11 @@ function requestCard(row, index, type, canReorder = false) {
           <button class="action-button primary" type="button" data-karaoke-play="${row.id}">${escapeHtml(t('dashboard.startKaraoke'))}</button>
           <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.completed'))}</button>
           <button class="action-button" data-action="accepted" data-id="${row.id}">${escapeHtml(t('dashboard.backQueue'))}</button>
+        </div>
+        <div class="request-actions karaoke-queue-actions">
+          <button class="action-button" type="button" data-karaoke-recall="${row.id}">${escapeHtml(t('dashboard.recallSinger'))}</button>
+          <button class="action-button" type="button" data-karaoke-skip="${row.id}">${escapeHtml(t('dashboard.skipSinger'))}</button>
+          <button class="action-button danger" type="button" data-karaoke-noshow="${row.id}">${escapeHtml(t('dashboard.noShow'))}</button>
         </div>`
       : `<div class="request-actions two">
           <button class="action-button success" data-action="played" data-id="${row.id}">${escapeHtml(t('dashboard.markPlayed'))}</button>
@@ -883,6 +897,63 @@ function sendKaraokeControl(action, requestId = null) {
   if (noticeKey) showDashboardNotice(t(noticeKey), 'success');
 }
 
+async function recallSinger(id) {
+  const row = requests.find(item => item.id === id);
+  if (!row || (row.request_type || 'song') !== 'karaoke' || row.status !== 'playing') {
+    showDashboardNotice(t('dashboard.noSingerCalled'), 'error');
+    return;
+  }
+
+  const recalledAt = new Date().toISOString();
+  const { error } = await supabase
+    .from('song_requests')
+    .update({ updated_at: recalledAt })
+    .eq('id', id);
+
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+
+  await broadcastGuestStatus(row, 'playing');
+  const pushSent = await sendKaraokePush(row);
+  await loadRequests();
+  if (pushSent !== false) showDashboardNotice(t('dashboard.singerRecalled'), 'success');
+}
+
+async function moveSingerToEnd(id, noShow = false) {
+  const row = requests.find(item => item.id === id);
+  if (!row || (row.request_type || 'song') !== 'karaoke' || row.status !== 'playing') {
+    showDashboardNotice(t('dashboard.noSingerCalled'), 'error');
+    return;
+  }
+
+  sendKaraokeControl('stop', id);
+
+  const activeRows = activeQueueRows('karaoke').filter(item => item.id !== id);
+  const maxSortOrder = activeRows.reduce((max, item) => Math.max(max, Number(item.sort_order || 0)), 0);
+  const updatedAt = new Date().toISOString();
+
+  const { error } = await supabase
+    .from('song_requests')
+    .update({
+      status: 'accepted',
+      sort_order: maxSortOrder + 1,
+      played_at: null,
+      updated_at: updatedAt,
+    })
+    .eq('id', id);
+
+  if (error) {
+    showDashboardNotice(error.message, 'error');
+    return;
+  }
+
+  await broadcastGuestStatus(row, 'accepted');
+  await loadRequests();
+  showDashboardNotice(t(noShow ? 'dashboard.noShowMoved' : 'dashboard.singerSkipped'), 'success');
+}
+
 async function completeAndCallNext() {
   if (!activeEvent) return;
   const rows = karaokeRequests();
@@ -958,15 +1029,17 @@ async function completeAndCallNext() {
 }
 
 async function sendKaraokePush(row) {
-  if (!row?.id || (row.request_type || 'song') !== 'karaoke') return;
+  if (!row?.id || (row.request_type || 'song') !== 'karaoke') return false;
   try {
     const { error } = await supabase.functions.invoke('karaoke-ready-push', {
       body: { request_id: row.id },
     });
     if (error) throw error;
+    return true;
   } catch (error) {
     console.warn('Drop My Song push notification failed:', error);
     showDashboardNotice(t('dashboard.pushDeliveryFailed'), 'error');
+    return false;
   }
 }
 
