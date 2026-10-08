@@ -26,6 +26,21 @@ async function sha256Hex(value: string) {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+function youtubeVideoId(value = '') {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    if (host === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0] || '';
+    if (!['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) return '';
+    if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (['embed', 'shorts', 'live'].includes(parts[0])) return parts[1] || '';
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -106,7 +121,7 @@ export default {
       const [{ data: requests, error: requestError }, { data: calls, error: callsError }] = await Promise.all([
         admin
           .from('song_requests')
-          .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at')
+          .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at,song_url,karaoke_video_url')
           .eq('event_id', invite.event_id)
           .in('status', ['pending', 'accepted', 'playing', 'cant_find'])
           .order('sort_order', { ascending: true })
@@ -125,7 +140,21 @@ export default {
         event_name: invite.event_name,
         event_slug: invite.event_slug,
         expires_at: invite.expires_at,
-        requests: requests || [],
+        requests: (requests || []).map((row: any) => ({
+          id: row.id,
+          event_id: row.event_id,
+          request_type: row.request_type,
+          artist: row.artist,
+          song: row.song,
+          requester_name: row.requester_name,
+          status: row.status,
+          sort_order: row.sort_order,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          karaoke_ready: row.request_type === 'karaoke'
+            ? !!youtubeVideoId(row.karaoke_video_url || row.song_url || '')
+            : null,
+        })),
         calls: calls || [],
       });
     }
