@@ -2686,3 +2686,101 @@ select:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Karaoke TV — explicit playback state UI */
+.karaoke-tv-singer-stack {
+  min-width: 0;
+}
+.karaoke-tv-singer-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.karaoke-state-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(140,165,200,.24);
+  background: rgba(120,140,170,.1);
+  color: #bfd0e2;
+  font-size: clamp(.58rem, .7vw, .72rem);
+  font-weight: 900;
+  letter-spacing: .07em;
+  white-space: nowrap;
+}
+.karaoke-state-badge.called,
+.karaoke-state-badge.starting {
+  color: #f0d7ff;
+  border-color: rgba(169,76,255,.38);
+  background: rgba(169,76,255,.15);
+}
+.karaoke-state-badge.playing {
+  color: #baf8dc;
+  border-color: rgba(54,219,154,.38);
+  background: rgba(54,219,154,.14);
+}
+.karaoke-state-badge.paused,
+.karaoke-state-badge.stopped {
+  color: #ffe4a8;
+  border-color: rgba(255,190,73,.4);
+  background: rgba(255,190,73,.13);
+}
+.karaoke-state-badge.finished {
+  color: #b9f7dd;
+  border-color: rgba(54,219,154,.34);
+  background: rgba(54,219,154,.11);
+}
+.karaoke-state-badge.fallback {
+  color: #ffc6d0;
+  border-color: rgba(255,77,109,.36);
+  background: rgba(255,77,109,.12);
+}
+
+.karaoke-playback-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  padding: clamp(20px, 4vw, 52px);
+  background:
+    radial-gradient(circle at 50% 43%, rgba(123,44,255,.22), transparent 34%),
+    linear-gradient(145deg, rgba(5,9,17,.92), rgba(2,4,8,.95));
+  backdrop-filter: blur(6px);
+}
+.karaoke-playback-overlay.hidden {
+  display: none;
+}
+.karaoke-playback-overlay > span {
+  font-size: clamp(3rem, 8vh, 6rem);
+  filter: drop-shadow(0 0 24px rgba(169,76,255,.3));
+}
+.karaoke-playback-overlay h2 {
+  margin: 3px 0 6px;
+  font-size: clamp(2rem, 5.5vh, 4.8rem);
+  letter-spacing: -.04em;
+}
+.karaoke-playback-overlay p:last-child {
+  max-width: 760px;
+  margin: 0;
+  color: #9fb0c5;
+  font-size: clamp(.9rem, 1.8vh, 1.3rem);
+}
+
+@media (max-width: 680px) {
+  .karaoke-tv-singer-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .karaoke-state-badge {
+    min-height: 24px;
+  }
+}
