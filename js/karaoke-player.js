@@ -29,6 +29,8 @@ let youtubePlayer = null;
 let youtubeApiReady = null;
 let directYoutubeWindow = null;
 let realtimeChannel = null;
+let remoteControlChannel = null;
+let remoteHeartbeatTimer = null;
 let pollingTimer = null;
 let currentRequestId = '';
 let youtubePlayerReady = false;
@@ -393,6 +395,38 @@ function handleKaraokeControl(message) {
   }
 }
 
+function sendRemoteHeartbeat() {
+  if (!remoteControlChannel) return;
+  remoteControlChannel.send({
+    type: 'broadcast',
+    event: 'karaoke-tv-heartbeat',
+    payload: {
+      event_id: eventId,
+      request_id: currentRequestId || null,
+      sent_at: Date.now(),
+    },
+  }).catch(() => {});
+}
+
+function startRemoteControl() {
+  if (remoteControlChannel) supabase.removeChannel(remoteControlChannel);
+  if (remoteHeartbeatTimer) clearInterval(remoteHeartbeatTimer);
+  remoteControlChannel = supabase
+    .channel(`dropmysong-karaoke-remote-${eventId}`)
+    .on('broadcast', { event: 'karaoke-control' }, payload => {
+      handleKaraokeControl(payload?.payload);
+    })
+    .on('broadcast', { event: 'karaoke-tv-ping' }, payload => {
+      if (payload?.payload?.event_id !== eventId) return;
+      sendRemoteHeartbeat();
+    })
+    .subscribe(status => {
+      if (status !== 'SUBSCRIBED') return;
+      sendRemoteHeartbeat();
+      remoteHeartbeatTimer = setInterval(sendRemoteHeartbeat, 4000);
+    });
+}
+
 function startRealtime() {
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
   realtimeChannel = supabase
@@ -412,6 +446,8 @@ function startRealtime() {
     if (event.key !== 'dropmysong-karaoke-control' || !event.newValue) return;
     try { handleKaraokeControl(JSON.parse(event.newValue)); } catch {}
   });
+
+  startRemoteControl();
 }
 
 openYoutubeFallback.addEventListener('click', () => {
@@ -444,6 +480,8 @@ window.addEventListener('beforeunload', () => {
   closeDirectYoutubeWindow();
   try { karaokeControlChannel?.close(); } catch {}
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+  if (remoteControlChannel) supabase.removeChannel(remoteControlChannel);
+  if (remoteHeartbeatTimer) clearInterval(remoteHeartbeatTimer);
   if (pollingTimer) clearInterval(pollingTimer);
 });
 
