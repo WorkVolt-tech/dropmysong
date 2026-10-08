@@ -2830,3 +2830,67 @@ select:hover {
   border-color: rgba(255,77,109,.25);
   background: rgba(255,77,109,.07);
 }
+
+
+/* Karaoke showtime preflight */
+.karaoke-preflight-card {
+  border-color: rgba(255,190,73,.24);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255,190,73,.09), transparent 42%),
+    linear-gradient(180deg, rgba(14,20,30,.97), rgba(7,12,20,.97));
+}
+.karaoke-preflight-card h2 {
+  margin: 4px 0 10px;
+  font-size: 1.15rem;
+}
+.karaoke-preflight-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.karaoke-preflight-stats > div {
+  min-width: 0;
+  padding: 9px 7px;
+  text-align: center;
+  border: 1px solid rgba(129,159,208,.15);
+  border-radius: 11px;
+  background: rgba(3,8,15,.38);
+}
+.karaoke-preflight-stats strong,
+.karaoke-preflight-stats span {
+  display: block;
+}
+.karaoke-preflight-stats strong {
+  color: #f3f8ff;
+  font-size: 1.15rem;
+}
+.karaoke-preflight-stats span {
+  margin-top: 2px;
+  color: #8292a8;
+  font-size: .63rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.karaoke-preflight-card > .muted {
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+.karaoke-preflight-card .secondary-button {
+  width: 100%;
+}
+.karaoke-preflight-card button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.request-meta-chip.karaoke-preflight-failed {
+  color: #ffc0cb;
+  border-color: rgba(255,77,109,.3);
+  background: rgba(255,77,109,.1);
+}
+
+@media (max-width: 480px) {
+  .karaoke-preflight-stats {
+    grid-template-columns: 1fr;
+  }
+}
