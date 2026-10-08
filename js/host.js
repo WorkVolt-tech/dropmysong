@@ -46,7 +46,7 @@ let hostCalls = new Map();
 let realtimeChannel = null;
 let qrPollTimer = null;
 let qrHostName = '';
-let announcedReady = new Set();
+let announcedReady = new Map();
 let noticeTimer = null;
 let audioContext = null;
 
@@ -164,9 +164,9 @@ async function loadQrQueue(initial = false) {
 
     if (!initial) {
       nextRequests
-        .filter(row => row.status === 'playing' && !announcedReady.has(row.id))
+        .filter(row => row.status === 'playing' && announcedReady.get(row.id) !== (row.updated_at || ''))
         .forEach(row => {
-          announcedReady.add(row.id);
+          announcedReady.set(row.id, row.updated_at || '');
           announceReady(row);
         });
     }
@@ -538,7 +538,11 @@ async function markCalled(requestId) {
 }
 
 function seedReadyAnnouncements() {
-  announcedReady = new Set(requests.filter(row => row.status === 'playing').map(row => row.id));
+  announcedReady = new Map(
+    requests
+      .filter(row => row.status === 'playing')
+      .map(row => [row.id, row.updated_at || ''])
+  );
 }
 
 function subscribeRealtime() {
@@ -554,8 +558,8 @@ function subscribeRealtime() {
       filter: `event_id=eq.${activeAssignment.event_id}`,
     }, async payload => {
       const row = payload.new;
-      if (row?.status === 'playing' && !announcedReady.has(row.id)) {
-        announcedReady.add(row.id);
+      if (row?.status === 'playing' && announcedReady.get(row.id) !== (row.updated_at || '')) {
+        announcedReady.set(row.id, row.updated_at || '');
         announceReady(row);
       }
       await loadRequests();
