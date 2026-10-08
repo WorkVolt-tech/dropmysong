@@ -24,6 +24,10 @@ let youtubeApiReady = null;
 let directYoutubeWindow = null;
 let realtimeChannel = null;
 let pollingTimer = null;
+let currentRequestId = '';
+let youtubePlayerReady = false;
+let pendingPlayRequestId = '';
+const karaokeControlChannel = 'BroadcastChannel' in window ? new BroadcastChannel('dropmysong-karaoke-control') : null;
 
 function showNotice(text, type = 'error') {
   notice.textContent = text;
@@ -95,6 +99,9 @@ function closeDirectYoutubeWindow() {
 function stopVideo() {
   currentVideoId = '';
   currentYoutubeUrl = '';
+  currentRequestId = '';
+  youtubePlayerReady = false;
+  pendingPlayRequestId = '';
   hideFallback();
   closeDirectYoutubeWindow();
   try {
@@ -132,13 +139,19 @@ async function loadVideo(url) {
       width: '100%',
       height: '100%',
       playerVars: {
-        autoplay: 1,
+        autoplay: 0,
         rel: 0,
         playsinline: 1,
       },
       events: {
         onReady: event => {
-          try { event.target.playVideo(); } catch {}
+          youtubePlayerReady = true;
+          try { event.target.pauseVideo(); } catch {}
+          if (pendingPlayRequestId && pendingPlayRequestId === currentRequestId) {
+            pendingPlayRequestId = '';
+            try { event.target.playVideo(); } catch {}
+            videoHint.textContent = 'Karaoke is playing.';
+          }
         },
         onError: event => {
           const code = Number(event.data);
@@ -220,15 +233,34 @@ async function refreshStage() {
   } else {
     singerName.textContent = current.requester_name || 'Singer';
     songTitle.textContent = `${current.artist} — ${current.song}`;
+    currentRequestId = current.id;
     const source = current.karaoke_video_url || current.song_url || '';
-    const playable = loadVideo(source);
+    const playable = await loadVideo(source);
     videoHint.textContent = playable
-      ? 'YouTube karaoke video loaded. If embedding is blocked, use the direct YouTube fallback.'
+      ? 'Singer called — waiting for the DJ to press Start Karaoke.'
       : 'No YouTube karaoke video is assigned yet. Set one from the DJ Dashboard.';
   }
 
   nextSinger.textContent = next?.requester_name || '—';
   nextSong.textContent = next ? `${next.artist} — ${next.song}` : 'Queue is waiting.';
+}
+
+function handleKaraokeControl(message) {
+  if (!message || message.action !== 'play') return;
+  if (message.event_id !== eventId || message.request_id !== currentRequestId) return;
+
+  if (!youtubePlayerReady || !youtubePlayer) {
+    pendingPlayRequestId = message.request_id;
+    videoHint.textContent = 'Starting karaoke…';
+    return;
+  }
+
+  try {
+    youtubePlayer.playVideo();
+    videoHint.textContent = 'Karaoke is playing.';
+  } catch {
+    pendingPlayRequestId = message.request_id;
+  }
 }
 
 function startRealtime() {
@@ -244,6 +276,12 @@ function startRealtime() {
     .subscribe();
 
   pollingTimer = setInterval(refreshStage, 5000);
+
+  karaokeControlChannel?.addEventListener('message', event => handleKaraokeControl(event.data));
+  window.addEventListener('storage', event => {
+    if (event.key !== 'dropmysong-karaoke-control' || !event.newValue) return;
+    try { handleKaraokeControl(JSON.parse(event.newValue)); } catch {}
+  });
 }
 
 openYoutubeFallback.addEventListener('click', () => {
@@ -274,6 +312,7 @@ document.addEventListener('fullscreenchange', () => {
 
 window.addEventListener('beforeunload', () => {
   closeDirectYoutubeWindow();
+  try { karaokeControlChannel?.close(); } catch {}
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
   if (pollingTimer) clearInterval(pollingTimer);
 });
