@@ -246,20 +246,46 @@ async function refreshStage() {
 }
 
 function handleKaraokeControl(message) {
-  if (!message || message.action !== 'play') return;
+  if (!message || !['play', 'pause', 'restart', 'stop'].includes(message.action)) return;
   if (message.event_id !== eventId || message.request_id !== currentRequestId) return;
 
   if (!youtubePlayerReady || !youtubePlayer) {
-    pendingPlayRequestId = message.request_id;
-    videoHint.textContent = 'Starting karaoke…';
+    if (message.action === 'play' || message.action === 'restart') {
+      pendingPlayRequestId = message.request_id;
+      videoHint.textContent = message.action === 'restart' ? 'Restarting karaoke…' : 'Starting karaoke…';
+    }
     return;
   }
 
   try {
-    youtubePlayer.playVideo();
-    videoHint.textContent = 'Karaoke is playing.';
+    if (message.action === 'play') {
+      youtubePlayer.playVideo();
+      videoHint.textContent = 'Karaoke is playing.';
+      return;
+    }
+
+    if (message.action === 'pause') {
+      youtubePlayer.pauseVideo();
+      videoHint.textContent = 'Karaoke paused.';
+      return;
+    }
+
+    if (message.action === 'restart') {
+      youtubePlayer.seekTo(0, true);
+      youtubePlayer.playVideo();
+      videoHint.textContent = 'Karaoke restarted.';
+      return;
+    }
+
+    if (message.action === 'stop') {
+      youtubePlayer.pauseVideo();
+      youtubePlayer.seekTo(0, true);
+      videoHint.textContent = 'Karaoke stopped — ready to start again.';
+    }
   } catch {
-    pendingPlayRequestId = message.request_id;
+    if (message.action === 'play' || message.action === 'restart') {
+      pendingPlayRequestId = message.request_id;
+    }
   }
 }
 
