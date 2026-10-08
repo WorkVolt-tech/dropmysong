@@ -152,6 +152,19 @@
               <button id="openKaraokePlayer" class="primary-button" type="button" data-i18n="dashboard.openKaraokeTv">Open Karaoke TV</button>
             </section>
 
+            <section class="panel karaoke-player-controls-card">
+              <p class="eyebrow" data-i18n="dashboard.karaokeControls">KARAOKE CONTROLS</p>
+              <h2 id="karaokeControlSinger">No singer called</h2>
+              <p id="karaokeControlSong" class="muted">Call a singer to load their karaoke track.</p>
+              <div class="karaoke-control-grid">
+                <button id="karaokePlayControl" class="primary-button" type="button" data-karaoke-global-control="play" disabled data-i18n="dashboard.karaokePlay">▶ Play / Resume</button>
+                <button id="karaokePauseControl" class="secondary-button" type="button" data-karaoke-global-control="pause" disabled data-i18n="dashboard.karaokePause">⏸ Pause</button>
+                <button id="karaokeRestartControl" class="secondary-button" type="button" data-karaoke-global-control="restart" disabled data-i18n="dashboard.karaokeRestart">↺ Restart</button>
+                <button id="karaokeStopControl" class="secondary-button" type="button" data-karaoke-global-control="stop" disabled data-i18n="dashboard.karaokeStop">■ Stop / Reset</button>
+              </div>
+              <button id="karaokeNextSingerControl" class="success-button karaoke-next-control" type="button" disabled data-i18n="dashboard.completeNextSinger">✓ Complete & Call Next</button>
+            </section>
+
             <section class="panel karaoke-ready-card-dj">
               <p class="eyebrow" data-i18n="dashboard.karaokeReady">READY TO SING</p>
               <div id="karaokeReadyList" class="mini-list"></div>
