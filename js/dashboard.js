@@ -47,6 +47,11 @@ const karaokePauseControl = document.querySelector('#karaokePauseControl');
 const karaokeRestartControl = document.querySelector('#karaokeRestartControl');
 const karaokeStopControl = document.querySelector('#karaokeStopControl');
 const karaokeNextSingerControl = document.querySelector('#karaokeNextSingerControl');
+const karaokePreflightQueued = document.querySelector('#karaokePreflightQueued');
+const karaokePreflightReady = document.querySelector('#karaokePreflightReady');
+const karaokePreflightMissing = document.querySelector('#karaokePreflightMissing');
+const karaokePreflightStatus = document.querySelector('#karaokePreflightStatus');
+const karaokePreflightCheck = document.querySelector('#karaokePreflightCheck');
 const youtubeSearchModal = document.querySelector('#youtubeSearchModal');
 const closeYoutubeSearch = document.querySelector('#closeYoutubeSearch');
 const youtubeSearchRequest = document.querySelector('#youtubeSearchRequest');
@@ -113,6 +118,8 @@ let analyticsEventId = null;
 let analyticsRows = [];
 let archiveSupported = true;
 let activeYoutubeRequestId = null;
+let karaokePreflightIssues = new Map();
+let karaokePreflightRunning = false;
 const karaokeControlChannel = 'BroadcastChannel' in window ? new BroadcastChannel('dropmysong-karaoke-control') : null;
 
 initI18n();
@@ -280,6 +287,7 @@ function renderAll() {
   renderKaraokeRequests();
   renderSongSideRail();
   renderKaraokeSideRail();
+  renderKaraokePreflight();
   renderHistory();
   updateDashboardHeader();
   if (currentTab === 'analytics') {
@@ -677,6 +685,7 @@ function requestCard(row, index, type, canReorder = false) {
     : '';
   const paymentPending = Number(row.tip_amount || 0) > 0 && row.payment_status === 'pending';
   const karaokeVideoReady = type === 'karaoke' && !!youtubeVideoId(row.karaoke_video_url || row.song_url || '');
+  const karaokePreflightIssue = type === 'karaoke' ? karaokePreflightIssues.get(row.id) : null;
   const paymentConfirmed = Number(row.tip_amount || 0) > 0 && row.payment_status === 'confirmed';
   const methodLabel = row.payment_method === 'etransfer' ? t('dashboard.etransfer') : row.payment_method === 'paypal' ? 'PayPal' : '';
   const personPrefix = type === 'karaoke' ? '🎤 ' : '👤 ';
@@ -750,6 +759,7 @@ function requestCard(row, index, type, canReorder = false) {
   const karaokeProviderTools = type === 'karaoke' ? `
     <div class="karaoke-provider-tools">
       <span class="request-meta-chip ${karaokeVideoReady ? 'confirmed' : 'pending'}">${karaokeVideoReady ? '▶ YouTube ready' : '⚠ YouTube video needed'}</span>
+      ${karaokePreflightIssue ? `<span class="request-meta-chip karaoke-preflight-failed">⚠ ${escapeHtml(t('dashboard.preflightFailedBadge'))}</span>` : ''}
       <div class="karaoke-provider-actions">
         <button type="button" class="action-button" data-youtube-search="${row.id}">🔎 ${escapeHtml(t('dashboard.searchYoutube'))}</button>
         <button type="button" class="action-button ${karaokeVideoReady ? '' : 'primary'}" data-karaoke-video="${row.id}">${escapeHtml(karaokeVideoReady ? t('dashboard.changeYoutubeVideo') : t('dashboard.setYoutubeVideo'))}</button>
@@ -1150,6 +1160,78 @@ function renderSongSideRail() {
     : `<div class="empty-state">${escapeHtml(t('dashboard.noAccepted'))}</div>`;
 }
 
+function renderKaraokePreflight() {
+  if (!karaokePreflightQueued || !karaokePreflightReady || !karaokePreflightMissing || !karaokePreflightStatus || !karaokePreflightCheck) return;
+
+  const queued = karaokeRequests().filter(row => ['accepted', 'playing'].includes(row.status));
+  const ready = queued.filter(row => youtubeVideoId(row.karaoke_video_url || row.song_url || ''));
+  const missing = queued.length - ready.length;
+  const failed = queued.filter(row => karaokePreflightIssues.has(row.id)).length;
+
+  karaokePreflightQueued.textContent = String(queued.length);
+  karaokePreflightReady.textContent = String(ready.length);
+  karaokePreflightMissing.textContent = String(missing);
+  karaokePreflightCheck.disabled = karaokePreflightRunning || queued.length === 0;
+
+  if (karaokePreflightRunning) {
+    karaokePreflightStatus.textContent = t('dashboard.preflightRunning');
+  } else if (!queued.length) {
+    karaokePreflightStatus.textContent = t('dashboard.preflightNoQueue');
+  } else if (failed) {
+    karaokePreflightStatus.textContent = t('dashboard.preflightProblems', { count: failed });
+  } else if (missing) {
+    karaokePreflightStatus.textContent = t('dashboard.preflightMissing', { count: missing });
+  } else {
+    karaokePreflightStatus.textContent = t('dashboard.preflightReady');
+  }
+}
+
+async function runKaraokePreflight() {
+  if (karaokePreflightRunning) return;
+
+  const queued = karaokeRequests().filter(row => ['accepted', 'playing'].includes(row.status));
+  if (!queued.length) {
+    renderKaraokePreflight();
+    return;
+  }
+
+  karaokePreflightRunning = true;
+  karaokePreflightIssues = new Map();
+  renderKaraokePreflight();
+  renderKaraokeRequests();
+
+  let checked = 0;
+  for (const row of queued) {
+    const source = row.karaoke_video_url || row.song_url || '';
+    if (!youtubeVideoId(source)) {
+      karaokePreflightIssues.set(row.id, t('dashboard.youtubeVideoRequired'));
+      continue;
+    }
+
+    const validation = await validateYoutubeVideo(source, true);
+    checked += 1;
+    if (!validation.valid) {
+      karaokePreflightIssues.set(row.id, validation.error || t('dashboard.youtubeUnavailableNow'));
+    }
+  }
+
+  karaokePreflightRunning = false;
+  renderKaraokePreflight();
+  renderKaraokeRequests();
+
+  const missing = queued.filter(row => !youtubeVideoId(row.karaoke_video_url || row.song_url || '')).length;
+  const failed = karaokePreflightIssues.size - missing;
+
+  if (karaokePreflightIssues.size) {
+    showDashboardNotice(t('dashboard.preflightFinishedProblems', {
+      missing,
+      failed: Math.max(0, failed),
+    }), 'error');
+  } else {
+    showDashboardNotice(t('dashboard.preflightFinishedReady', { count: checked }), 'success');
+  }
+}
+
 function renderKaraokeSideRail() {
   const rows = karaokeRequests();
   const current = rows.find(row => row.status === 'playing') || null;
@@ -1207,6 +1289,7 @@ document.querySelectorAll('[data-karaoke-global-control]').forEach(button => {
   button.addEventListener('click', () => sendKaraokeControl(button.dataset.karaokeGlobalControl));
 });
 karaokeNextSingerControl.addEventListener('click', completeAndCallNext);
+karaokePreflightCheck?.addEventListener('click', runKaraokePreflight);
 
 requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked, t('dashboard.requests')));
 karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
