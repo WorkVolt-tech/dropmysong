@@ -40,6 +40,8 @@ const playedCount = document.querySelector('#playedCount');
 const karaokePlayedList = document.querySelector('#karaokePlayedList');
 const karaokePlayedCount = document.querySelector('#karaokePlayedCount');
 const openKaraokePlayer = document.querySelector('#openKaraokePlayer');
+const karaokeTvConnection = document.querySelector('#karaokeTvConnection');
+const karaokeTvConnectionText = document.querySelector('#karaokeTvConnectionText');
 const karaokeControlSinger = document.querySelector('#karaokeControlSinger');
 const karaokeControlSong = document.querySelector('#karaokeControlSong');
 const karaokePlayControl = document.querySelector('#karaokePlayControl');
@@ -108,6 +110,10 @@ let events = [];
 let activeEvent = null;
 let requests = [];
 let realtimeChannel = null;
+let karaokeRemoteChannel = null;
+let karaokeRemoteReady = false;
+let karaokeTvLastSeen = 0;
+let karaokeTvConnectionTimer = null;
 let currentTab = 'queue';
 let modalEvent = null;
 let noticeTimer = null;
@@ -217,6 +223,7 @@ async function activateEvent(eventId) {
   renderEventLinksAndQr();
   await loadRequests();
   subscribeToRequests();
+  subscribeKaraokeRemoteControl();
 }
 
 async function openEvent(eventId) {
@@ -265,9 +272,62 @@ function subscribeToRequests() {
     .subscribe();
 }
 
+function setKaraokeTvConnection(connected) {
+  if (!karaokeTvConnection || !karaokeTvConnectionText) return;
+  karaokeTvConnection.classList.toggle('connected', connected);
+  karaokeTvConnection.classList.toggle('disconnected', !connected);
+  karaokeTvConnectionText.textContent = t(connected ? 'dashboard.karaokeTvConnected' : 'dashboard.karaokeTvDisconnected');
+}
+
+function markKaraokeTvSeen() {
+  karaokeTvLastSeen = Date.now();
+  setKaraokeTvConnection(true);
+}
+
+function subscribeKaraokeRemoteControl() {
+  if (karaokeRemoteChannel) supabase.removeChannel(karaokeRemoteChannel);
+  karaokeRemoteChannel = null;
+  karaokeRemoteReady = false;
+  karaokeTvLastSeen = 0;
+  setKaraokeTvConnection(false);
+
+  if (!activeEvent) return;
+
+  karaokeRemoteChannel = supabase
+    .channel(`dropmysong-karaoke-remote-${activeEvent.id}`)
+    .on('broadcast', { event: 'karaoke-tv-heartbeat' }, payload => {
+      if (payload?.payload?.event_id !== activeEvent?.id) return;
+      markKaraokeTvSeen();
+    })
+    .subscribe(status => {
+      karaokeRemoteReady = status === 'SUBSCRIBED';
+      if (karaokeRemoteReady) {
+        karaokeRemoteChannel.send({
+          type: 'broadcast',
+          event: 'karaoke-tv-ping',
+          payload: { event_id: activeEvent.id, sent_at: Date.now() },
+        }).catch(() => {});
+      }
+    });
+
+  if (karaokeTvConnectionTimer) clearInterval(karaokeTvConnectionTimer);
+  karaokeTvConnectionTimer = setInterval(() => {
+    if (!karaokeTvLastSeen || Date.now() - karaokeTvLastSeen > 12000) {
+      setKaraokeTvConnection(false);
+    }
+  }, 3000);
+}
+
 function teardownRealtime() {
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
+  if (karaokeRemoteChannel) supabase.removeChannel(karaokeRemoteChannel);
   realtimeChannel = null;
+  karaokeRemoteChannel = null;
+  karaokeRemoteReady = false;
+  karaokeTvLastSeen = 0;
+  if (karaokeTvConnectionTimer) clearInterval(karaokeTvConnectionTimer);
+  karaokeTvConnectionTimer = null;
+  setKaraokeTvConnection(false);
 }
 
 function songRequests() {
@@ -896,6 +956,14 @@ function sendKaraokeControl(action, requestId = null) {
     localStorage.setItem('dropmysong-karaoke-control', JSON.stringify(message));
     localStorage.removeItem('dropmysong-karaoke-control');
   } catch {}
+
+  if (karaokeRemoteReady && karaokeRemoteChannel) {
+    karaokeRemoteChannel.send({
+      type: 'broadcast',
+      event: 'karaoke-control',
+      payload: message,
+    }).catch(error => console.warn('Drop My Song remote karaoke control failed:', error));
+  }
 
   const noticeKey = {
     play: 'dashboard.karaokeStarted',
