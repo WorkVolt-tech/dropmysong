@@ -2636,3 +2636,53 @@ select:hover {
   height: 100vh;
   min-height: 0;
 }
+
+
+/* DJ karaoke transport controls */
+.karaoke-player-controls-card {
+  border-color: rgba(0, 194, 255, .22);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(123,44,255,.12), transparent 40%),
+    linear-gradient(180deg, rgba(10,18,31,.97), rgba(6,11,20,.97));
+}
+.karaoke-player-controls-card h2 {
+  margin: 4px 0 3px;
+  font-size: 1.2rem;
+}
+.karaoke-player-controls-card > .muted {
+  margin: 0 0 12px;
+}
+.karaoke-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.karaoke-control-grid button {
+  width: 100%;
+  min-width: 0;
+}
+.karaoke-next-control {
+  width: 100%;
+  margin-top: 9px;
+  min-height: 42px;
+  border: 1px solid rgba(54,219,154,.34);
+  border-radius: 11px;
+  background: rgba(54,219,154,.13);
+  color: #c9ffe9;
+  font-weight: 850;
+  cursor: pointer;
+}
+.karaoke-next-control:hover:not(:disabled) {
+  background: rgba(54,219,154,.19);
+  border-color: rgba(54,219,154,.5);
+}
+.karaoke-player-controls-card button:disabled {
+  opacity: .42;
+  cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .karaoke-control-grid {
+    grid-template-columns: 1fr;
+  }
+}
