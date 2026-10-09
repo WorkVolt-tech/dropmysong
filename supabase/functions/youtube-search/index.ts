@@ -67,29 +67,36 @@ async function youtube(path: string, params: Record<string, string>) {
   return data;
 }
 
-async function validatedVideoDetails(ids: string[]) {
+async function videoDetails(ids: string[]) {
   if (!ids.length) return [];
   const data = await youtube('videos', {
     part: 'snippet,status,contentDetails',
     id: ids.join(','),
   });
 
-  return (data.items || [])
-    .filter((item: any) => item?.status?.embeddable === true && item?.status?.privacyStatus === 'public')
-    .map((item: any) => ({
-      video_id: item.id,
-      title: item.snippet?.title || 'YouTube video',
-      channel: item.snippet?.channelTitle || '',
-      thumbnail:
-        item.snippet?.thumbnails?.medium?.url ||
-        item.snippet?.thumbnails?.high?.url ||
-        item.snippet?.thumbnails?.default?.url ||
-        '',
-      duration: item.contentDetails?.duration || '',
-      embeddable: true,
-      privacy_status: item.status?.privacyStatus || '',
-      url: `https://www.youtube.com/watch?v=${item.id}`,
-    }));
+  return (data.items || []).map((item: any) => ({
+    video_id: item.id,
+    title: item.snippet?.title || 'YouTube video',
+    channel: item.snippet?.channelTitle || '',
+    thumbnail:
+      item.snippet?.thumbnails?.medium?.url ||
+      item.snippet?.thumbnails?.high?.url ||
+      item.snippet?.thumbnails?.default?.url ||
+      '',
+    duration: item.contentDetails?.duration || '',
+    embeddable: item?.status?.embeddable === true,
+    privacy_status: item.status?.privacyStatus || '',
+    upload_status: item.status?.uploadStatus || '',
+    url: `https://www.youtube.com/watch?v=${item.id}`,
+  }));
+}
+
+async function validatedVideoDetails(ids: string[]) {
+  const items = await videoDetails(ids);
+  return items.filter((item: any) =>
+    item.embeddable === true &&
+    item.privacy_status === 'public'
+  );
 }
 
 export default {
@@ -120,16 +127,28 @@ export default {
           return json({ error: 'Invalid YouTube video ID' }, 400);
         }
 
-        const items = await validatedVideoDetails([videoId]);
-        if (!items.length) {
+        const items = await videoDetails([videoId]);
+        const video = items[0] || null;
+        const available = !!video
+          && video.privacy_status !== 'private'
+          && video.upload_status !== 'deleted'
+          && video.upload_status !== 'rejected';
+
+        if (!available) {
           return json({
             valid: false,
+            available: false,
             embeddable: false,
-            error: 'This video is not available for embedded playback.',
+            error: 'This YouTube video is unavailable or private.',
           });
         }
 
-        return json({ valid: true, embeddable: true, video: items[0] });
+        return json({
+          valid: true,
+          available: true,
+          embeddable: video.embeddable === true,
+          video,
+        });
       }
 
       const query = (body.query || '').trim().slice(0, 180);
