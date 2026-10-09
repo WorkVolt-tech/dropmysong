@@ -607,7 +607,7 @@ form.addEventListener('submit', async event => {
         subtitle: artist,
       });
 
-      artist ||= (preview?.artistName || preview?.subtitle || preview?.providerName || 'Linked song').trim();
+      artist ||= (preview?.artistName || preview?.subtitle || 'Artist not provided').trim();
       song ||= (preview?.trackTitle || preview?.title || 'Song from link').trim();
 
       if (!artist) artist = 'Linked song';
