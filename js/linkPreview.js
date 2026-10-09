@@ -1,4 +1,5 @@
 import { escapeHtml } from './common.js';
+import { supabase } from './supabaseClient.js';
 
 const previewCache = new Map();
 
@@ -128,14 +129,24 @@ async function resolveRemotePreview(url, provider) {
   }
 
   if (provider.key === 'spotify') {
+    let metadata = null;
+    try {
+      const { data, error } = await supabase.functions.invoke('link-metadata', {
+        body: { url: url.href },
+      });
+      if (!error && data && !data.error) metadata = data;
+    } catch (error) {
+      console.debug('DropMySong Spotify metadata resolver fallback:', error?.message || error);
+    }
+
     const data = await fetchJson(`https://open.spotify.com/oembed?url=${encodeURIComponent(url.href)}`);
-    const inferred = inferArtistAndTrack(data.title || '', data.author_name || '');
+    const inferred = inferArtistAndTrack(data.title || '', '');
     return {
-      title: data.title || '',
-      subtitle: inferred.artistName || '',
-      trackTitle: inferred.trackTitle || data.title || '',
-      artistName: inferred.artistName || '',
-      imageUrl: data.thumbnail_url || '',
+      title: metadata?.trackTitle || data.title || '',
+      subtitle: metadata?.artistName || '',
+      trackTitle: metadata?.trackTitle || inferred.trackTitle || data.title || '',
+      artistName: metadata?.artistName || '',
+      imageUrl: metadata?.imageUrl || data.thumbnail_url || '',
       providerName: data.provider_name || provider.name,
     };
   }
@@ -232,7 +243,7 @@ export async function getLinkPreview(value, fallback = {}) {
     }
 
     if (!preview.artistName) {
-      preview.artistName = preview.fallbackSubtitle || provider.name;
+      preview.artistName = preview.fallbackSubtitle || 'Artist not provided';
     }
 
     if (!preview.title) preview.title = preview.trackTitle;
