@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v41-manual-youtube-save';
+const CACHE = 'dropmysong-v42-spotify-artist-fix';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './host.html', './karaoke.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/karaoke-player.js', './js/register-sw.js',
