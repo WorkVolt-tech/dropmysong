@@ -427,18 +427,26 @@ function bindRequestActions(container, type, canReorder = false) {
 }
 
 function youtubeVideoId(value = '') {
+  const raw = String(value || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(raw)) return raw;
+
   try {
-    const url = new URL(value);
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
     const host = url.hostname.replace(/^www\./, '').toLowerCase();
     if (host === 'youtu.be') return url.pathname.split('/').filter(Boolean)[0] || '';
     if (!['youtube.com', 'm.youtube.com', 'music.youtube.com'].includes(host)) return '';
     if (url.pathname === '/watch') return url.searchParams.get('v') || '';
     const parts = url.pathname.split('/').filter(Boolean);
-    if (['embed', 'shorts', 'live'].includes(parts[0])) return parts[1] || '';
+    if (['embed', 'shorts', 'live', 'v'].includes(parts[0])) return parts[1] || '';
     return '';
   } catch {
     return '';
   }
+}
+
+function canonicalYoutubeUrl(value = '') {
+  const videoId = youtubeVideoId(value);
+  return videoId ? `https://www.youtube.com/watch?v=${videoId}` : '';
 }
 
 function showYoutubeSearchNotice(text, type = 'error') {
@@ -636,11 +644,15 @@ async function validateYoutubeVideo(url, force = false) {
   if (error || !data) {
     return { valid: false, error: error?.message || t('dashboard.youtubeValidationFailed') };
   }
-  if (!data.valid || !data.embeddable) {
-    return { valid: false, error: data.error || t('dashboard.youtubeNotEmbeddable') };
+  if (!data.valid) {
+    return { valid: false, error: data.error || t('dashboard.youtubeUnavailableManual') };
   }
 
-  const validation = { valid: true, video: data.video };
+  const validation = {
+    valid: true,
+    embeddable: data.embeddable !== false,
+    video: data.video,
+  };
   cache[cacheKey] = {
     validation,
     saved_at: Date.now(),
@@ -667,7 +679,12 @@ async function recheckKaraokeVideo(id) {
     return;
   }
 
-  showDashboardNotice(t('dashboard.youtubeVerifiedReady'), 'success');
+  showDashboardNotice(
+    validation.embeddable === false
+      ? t('dashboard.youtubeDirectFallbackReady')
+      : t('dashboard.youtubeVerifiedReady'),
+    'success'
+  );
 }
 
 async function saveKaraokeVideo(id, url) {
@@ -711,7 +728,10 @@ async function setKaraokeVideo(id) {
     return;
   }
 
-  await saveKaraokeVideo(id, validation.video?.url || url);
+  const saved = await saveKaraokeVideo(id, validation.video?.url || canonicalYoutubeUrl(url) || url);
+  if (saved && validation.embeddable === false) {
+    showDashboardNotice(t('dashboard.youtubeDirectFallbackSaved'), 'success');
+  }
 }
 
 youtubeSearchForm.addEventListener('submit', event => {
