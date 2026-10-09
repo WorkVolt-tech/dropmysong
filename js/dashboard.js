@@ -721,16 +721,15 @@ async function setKaraokeVideo(id) {
     return;
   }
 
-  showDashboardNotice(t('dashboard.youtubeValidating'));
-  const validation = await validateYoutubeVideo(url);
-  if (!validation.valid) {
-    showDashboardNotice(validation.error || t('dashboard.youtubeNotEmbeddable'), 'error');
+  const normalizedUrl = canonicalYoutubeUrl(url);
+  if (!normalizedUrl) {
+    showDashboardNotice(t('dashboard.youtubeUrlInvalid'), 'error');
     return;
   }
 
-  const saved = await saveKaraokeVideo(id, validation.video?.url || canonicalYoutubeUrl(url) || url);
-  if (saved && validation.embeddable === false) {
-    showDashboardNotice(t('dashboard.youtubeDirectFallbackSaved'), 'success');
+  const saved = await saveKaraokeVideo(id, normalizedUrl);
+  if (saved) {
+    showDashboardNotice(t('dashboard.youtubeManualSaved'), 'success');
   }
 }
 
