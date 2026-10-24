@@ -145,7 +145,7 @@ tipButtons.addEventListener('click', event => {
   const button = event.target.closest('[data-tip]');
   if (!button) return;
   const alreadyActive = button.classList.contains('active');
-  const required = !!publicEvent?.tips_enabled;
+  const required = publicEvent?.tips_visible !== false && !!publicEvent?.tips_enabled;
   tipButtons.querySelectorAll('[data-tip]').forEach(item => item.classList.remove('active'));
   if (alreadyActive && !required) {
     tipAmount.value = '';
@@ -192,8 +192,24 @@ function renderTipOptions() {
 }
 
 function syncPaymentUi() {
-  const required = !!publicEvent?.tips_enabled;
-  tipsPanel.classList.remove('hidden');
+  const visible = publicEvent?.tips_visible !== false;
+  const required = visible && !!publicEvent?.tips_enabled;
+  tipsPanel.classList.toggle('hidden', !visible);
+
+  if (!visible) {
+    tipAmount.value = '';
+    paymentMethod.value = '';
+    paymentSenderName.value = '';
+    paymentMethods.classList.add('hidden');
+    paypalFields.classList.add('hidden');
+    etransferFields.classList.add('hidden');
+    tipButtons.querySelectorAll('[data-tip]').forEach(button => {
+      button.classList.remove('active');
+      button.disabled = true;
+    });
+    paymentMethods.querySelectorAll('[data-payment-method]').forEach(button => button.classList.remove('active'));
+    return;
+  }
   tipRequirementCopy.textContent = t(required ? 'guest.tipCopyRequired' : 'guest.tipCopy');
   tipRequiredBadge.classList.toggle('hidden', !required);
 
@@ -447,11 +463,14 @@ async function loadEvent() {
 
   // v2 keeps the existing public event RPC and reads only the public karaoke toggle
   // from a tiny view. This avoids replacing database functions during the upgrade.
-  const { data: optionRows, error: optionsError } = await supabase
-    .from('dropmysong_event_options')
-    .select('karaoke_enabled,tips_enabled,tip_options,paypal_enabled,paypal_me_url,etransfer_enabled,etransfer_email')
-    .eq('id', publicEvent.id)
-    .limit(1);
+  const [{ data: optionRows, error: optionsError }, { data: visibilityRows, error: visibilityError }] = await Promise.all([
+    supabase
+      .from('dropmysong_event_options')
+      .select('karaoke_enabled,tips_enabled,tip_options,paypal_enabled,paypal_me_url,etransfer_enabled,etransfer_email')
+      .eq('id', publicEvent.id)
+      .limit(1),
+    supabase.rpc('get_event_tip_visibility', { p_event_id: publicEvent.id }),
+  ]);
 
   if (!optionsError && optionRows?.length) {
     publicEvent = { ...publicEvent, ...optionRows[0] };
@@ -460,6 +479,10 @@ async function loadEvent() {
     publicEvent.karaoke_enabled = true;
     publicEvent.tip_options = [5, 10, 15, 20];
   }
+
+  publicEvent.tips_visible = !visibilityError && visibilityRows?.length
+    ? visibilityRows[0].tips_visible !== false
+    : true;
 
   // Drop My Song is currently for DJ Maxo, so payment destinations are global
   // rather than saved separately on every event.
@@ -567,9 +590,10 @@ form.addEventListener('submit', async event => {
     return;
   }
 
-  const selectedTip = Number(tipAmount.value || 0);
-  const selectedPaymentMethod = paymentMethod.value;
-  const tipsRequired = !!publicEvent?.tips_enabled;
+  const tipsVisible = publicEvent?.tips_visible !== false;
+  const selectedTip = tipsVisible ? Number(tipAmount.value || 0) : 0;
+  const selectedPaymentMethod = tipsVisible ? paymentMethod.value : '';
+  const tipsRequired = tipsVisible && !!publicEvent?.tips_enabled;
 
   if (tipsRequired && !selectedTip) {
     showNotice(t('notice.tipRequired'), 'error');
