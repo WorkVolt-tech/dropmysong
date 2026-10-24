@@ -1609,7 +1609,6 @@ eventForm.addEventListener('submit', async event => {
     requests_enabled: true,
     karaoke_enabled: true,
     tips_enabled: false,
-    tips_visible: true,
     is_active: events.filter(item => !item.archived_at).length === 0,
   }).select('id').single();
 
