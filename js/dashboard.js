@@ -216,7 +216,7 @@ async function activateEvent(eventId) {
   activeEventName.textContent = `${activeEvent.name}${activeEvent.is_active ? '' : ` · ${t('dashboard.inactive')}`}`;
   requestsToggle.checked = !!activeEvent.requests_enabled;
   karaokeToggle.checked = activeEvent.karaoke_enabled !== false;
-  tipsToggle.checked = !!activeEvent.tips_enabled;
+  tipsToggle.checked = activeEvent.tips_visible !== false;
   syncPaymentSettingsForm();
   clearHostInviteQr();
   syncHostAccessPanel();
@@ -1381,8 +1381,7 @@ karaokePreflightCheck?.addEventListener('click', runKaraokePreflight);
 requestsToggle.addEventListener('change', () => updateEventSetting('requests_enabled', requestsToggle.checked, t('dashboard.requests')));
 karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
 tipsToggle.addEventListener('change', async () => {
-  await updateEventSetting('tips_enabled', tipsToggle.checked, t('dashboard.tipsRequired'));
-  requireTipSetting.checked = tipsToggle.checked;
+  await updateEventSetting('tips_visible', tipsToggle.checked, t('dashboard.showTips'));
 });
 
 async function updateEventSetting(field, value, label) {
@@ -1392,12 +1391,11 @@ async function updateEventSetting(field, value, label) {
     showDashboardNotice(error.message, 'error');
     if (field === 'requests_enabled') requestsToggle.checked = !value;
     if (field === 'karaoke_enabled') karaokeToggle.checked = !value;
-    if (field === 'tips_enabled') tipsToggle.checked = !value;
+    if (field === 'tips_visible') tipsToggle.checked = !value;
     return;
   }
   activeEvent[field] = value;
   events = events.map(item => item.id === activeEvent.id ? { ...item, [field]: value } : item);
-  if (field === 'tips_enabled') requireTipSetting.checked = value;
   showDashboardNotice(t(value ? 'dashboard.settingEnabled' : 'dashboard.settingDisabled', { name: label }), 'success');
 }
 
@@ -1446,7 +1444,6 @@ paymentSettingsForm.addEventListener('submit', async event => {
 
   activeEvent = { ...activeEvent, ...payload };
   events = events.map(item => item.id === activeEvent.id ? { ...item, ...payload } : item);
-  tipsToggle.checked = tipsRequired;
   syncPaymentSettingsForm();
   showDashboardNotice(t('dashboard.paymentSettingsSaved'), 'success');
 });
@@ -1612,6 +1609,7 @@ eventForm.addEventListener('submit', async event => {
     requests_enabled: true,
     karaoke_enabled: true,
     tips_enabled: false,
+    tips_visible: true,
     is_active: events.filter(item => !item.archived_at).length === 0,
   }).select('id').single();
 
