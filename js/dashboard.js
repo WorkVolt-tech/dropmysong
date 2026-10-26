@@ -22,6 +22,7 @@ const activeEventName = document.querySelector('#activeEventName');
 const requestsToggle = document.querySelector('#requestsToggle');
 const karaokeToggle = document.querySelector('#karaokeToggle');
 const tipsToggle = document.querySelector('#tipsToggle');
+const tipsRequiredToggle = document.querySelector('#tipsRequiredToggle');
 const nowPlayingTitle = document.querySelector('#nowPlayingTitle');
 const nowPlayingArtist = document.querySelector('#nowPlayingArtist');
 const nextUpList = document.querySelector('#nextUpList');
@@ -203,6 +204,7 @@ async function activateEvent(eventId) {
     requestsToggle.checked = false;
     karaokeToggle.checked = false;
     tipsToggle.checked = false;
+    tipsRequiredToggle.checked = false;
     syncPaymentSettingsForm();
     clearHostInviteQr();
     syncHostAccessPanel();
@@ -217,6 +219,7 @@ async function activateEvent(eventId) {
   requestsToggle.checked = !!activeEvent.requests_enabled;
   karaokeToggle.checked = activeEvent.karaoke_enabled !== false;
   tipsToggle.checked = activeEvent.tips_visible !== false;
+  tipsRequiredToggle.checked = !!activeEvent.tips_enabled;
   syncPaymentSettingsForm();
   clearHostInviteQr();
   syncHostAccessPanel();
@@ -1383,6 +1386,9 @@ karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabl
 tipsToggle.addEventListener('change', async () => {
   await updateEventSetting('tips_visible', tipsToggle.checked, t('dashboard.showTips'));
 });
+tipsRequiredToggle.addEventListener('change', async () => {
+  await updateEventSetting('tips_enabled', tipsRequiredToggle.checked, t('dashboard.tipsRequired'));
+});
 
 async function updateEventSetting(field, value, label) {
   if (!activeEvent) return;
@@ -1392,10 +1398,18 @@ async function updateEventSetting(field, value, label) {
     if (field === 'requests_enabled') requestsToggle.checked = !value;
     if (field === 'karaoke_enabled') karaokeToggle.checked = !value;
     if (field === 'tips_visible') tipsToggle.checked = !value;
+    if (field === 'tips_enabled') {
+      tipsRequiredToggle.checked = !value;
+      requireTipSetting.checked = !value;
+    }
     return;
   }
   activeEvent[field] = value;
   events = events.map(item => item.id === activeEvent.id ? { ...item, [field]: value } : item);
+  if (field === 'tips_enabled') {
+    tipsRequiredToggle.checked = value;
+    requireTipSetting.checked = value;
+  }
   showDashboardNotice(t(value ? 'dashboard.settingEnabled' : 'dashboard.settingDisabled', { name: label }), 'success');
 }
 
@@ -1413,6 +1427,7 @@ function syncPaymentSettingsForm() {
   if (!activeEvent) return;
 
   requireTipSetting.checked = !!activeEvent.tips_enabled;
+  tipsRequiredToggle.checked = !!activeEvent.tips_enabled;
   const options = normalizeTipOptions(activeEvent.tip_options);
   tipOptionInputs.forEach((input, index) => { input.value = options[index]; });
   paypalConfiguredValue.textContent = t('dashboard.paypalAutomatic');
@@ -1444,6 +1459,7 @@ paymentSettingsForm.addEventListener('submit', async event => {
 
   activeEvent = { ...activeEvent, ...payload };
   events = events.map(item => item.id === activeEvent.id ? { ...item, ...payload } : item);
+  tipsRequiredToggle.checked = tipsRequired;
   syncPaymentSettingsForm();
   showDashboardNotice(t('dashboard.paymentSettingsSaved'), 'success');
 });
