@@ -23,6 +23,8 @@ const requestsToggle = document.querySelector('#requestsToggle');
 const karaokeToggle = document.querySelector('#karaokeToggle');
 const tipsToggle = document.querySelector('#tipsToggle');
 const tipsRequiredToggle = document.querySelector('#tipsRequiredToggle');
+const tipsRequiredToggleCard = document.querySelector('#tipsRequiredToggleCard');
+const requireTipSettingRow = document.querySelector('#requireTipSettingRow');
 const nowPlayingTitle = document.querySelector('#nowPlayingTitle');
 const nowPlayingArtist = document.querySelector('#nowPlayingArtist');
 const nextUpList = document.querySelector('#nextUpList');
@@ -1385,10 +1387,19 @@ requestsToggle.addEventListener('change', () => updateEventSetting('requests_ena
 karaokeToggle.addEventListener('change', () => updateEventSetting('karaoke_enabled', karaokeToggle.checked, t('dashboard.karaoke')));
 tipsToggle.addEventListener('change', async () => {
   await updateEventSetting('tips_visible', tipsToggle.checked, t('dashboard.showTips'));
+  syncTipVisibilityControls();
 });
 tipsRequiredToggle.addEventListener('change', async () => {
   await updateEventSetting('tips_enabled', tipsRequiredToggle.checked, t('dashboard.tipsRequired'));
 });
+
+function syncTipVisibilityControls() {
+  const showTips = !!activeEvent && activeEvent.tips_visible !== false;
+  tipsRequiredToggleCard?.classList.toggle('hidden', !showTips);
+  requireTipSettingRow?.classList.toggle('hidden', !showTips);
+  tipsRequiredToggle.disabled = !showTips || !activeEvent;
+  requireTipSetting.disabled = !showTips || !activeEvent;
+}
 
 async function updateEventSetting(field, value, label) {
   if (!activeEvent) return;
@@ -1397,7 +1408,10 @@ async function updateEventSetting(field, value, label) {
     showDashboardNotice(error.message, 'error');
     if (field === 'requests_enabled') requestsToggle.checked = !value;
     if (field === 'karaoke_enabled') karaokeToggle.checked = !value;
-    if (field === 'tips_visible') tipsToggle.checked = !value;
+    if (field === 'tips_visible') {
+      tipsToggle.checked = !value;
+      syncTipVisibilityControls();
+    }
     if (field === 'tips_enabled') {
       tipsRequiredToggle.checked = !value;
       requireTipSetting.checked = !value;
@@ -1410,6 +1424,7 @@ async function updateEventSetting(field, value, label) {
     tipsRequiredToggle.checked = value;
     requireTipSetting.checked = value;
   }
+  if (field === 'tips_visible') syncTipVisibilityControls();
   showDashboardNotice(t(value ? 'dashboard.settingEnabled' : 'dashboard.settingDisabled', { name: label }), 'success');
 }
 
@@ -1424,6 +1439,7 @@ function syncPaymentSettingsForm() {
   const disabled = !activeEvent;
   paymentSettingsForm.querySelectorAll('input,button').forEach(control => { control.disabled = disabled; });
   paymentSettingsEventName.textContent = activeEvent ? activeEvent.name : t('dashboard.selectEventForPayments');
+  syncTipVisibilityControls();
   if (!activeEvent) return;
 
   requireTipSetting.checked = !!activeEvent.tips_enabled;
