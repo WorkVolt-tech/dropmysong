@@ -1,4 +1,4 @@
-const CACHE = 'dropmysong-v44-tip-controls';
+const CACHE = 'dropmysong-v45-tip-required-visibility';
 const STATIC_ASSETS = [
   './', './index.html', './dj.html', './host.html', './karaoke.html', './css/styles.css',
   './js/common.js', './js/i18n.js', './js/config.js', './js/supabaseClient.js', './js/linkPreview.js', './js/request.js', './js/dashboard.js', './js/host.js', './js/karaoke-player.js', './js/register-sw.js',
