@@ -77,7 +77,7 @@
             <input id="tipsToggle" type="checkbox" />
             <i></i>
           </label>
-          <label class="toggle-card">
+          <label id="tipsRequiredToggleCard" class="toggle-card">
             <span data-i18n="dashboard.tipsRequired">Tips Required</span>
             <input id="tipsRequiredToggle" type="checkbox" />
             <i></i>
@@ -361,7 +361,7 @@
             <h2 data-i18n="dashboard.paymentSettingsTitle">Selected Event Payment Settings</h2>
             <p id="paymentSettingsEventName" class="muted" data-i18n="dashboard.selectEventForPayments">Select an event to configure payments.</p>
             <form id="paymentSettingsForm" class="payment-settings-form">
-              <label class="settings-toggle-row">
+              <label id="requireTipSettingRow" class="settings-toggle-row">
                 <div>
                   <strong data-i18n="dashboard.requireTip">Require a tip for every request</strong>
                   <small data-i18n="dashboard.requireTipCopy">OFF = tips stay visible and are optional. ON = every request must include a tip.</small>
