@@ -293,6 +293,7 @@ export default {
       guest_token?: string;
       order_id?: string;
       language?: string;
+      return_page?: 'app';
     } = {};
 
     try { body = await req.json(); } catch { return json({ error: 'Invalid request body' }, 400); }
@@ -342,7 +343,7 @@ export default {
       if (!eventRow) return json({ error: 'Event not found' }, 404);
 
       const appBase = Deno.env.get('DMS_PUBLIC_APP_URL') || 'https://workvolt-tech.github.io/dropmysong/';
-      const returnUrl = new URL('index.html', appBase);
+      const returnUrl = new URL(body.return_page === 'app' ? 'app.html' : 'index.html', appBase);
       returnUrl.searchParams.set('event', eventRow.slug);
       returnUrl.searchParams.set('paypal', 'return');
       returnUrl.searchParams.set('request', requestRow.id);
