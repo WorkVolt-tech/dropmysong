@@ -47,3 +47,10 @@ h1 span { color: #31dba0; }
 .form-feedback { padding:14px; border-radius:9px; background:#152d37; border:1px solid #416a71; margin-top:16px; }
 .full-guest-link { margin-top:18px; font-size:13px; }
 .react-guest-form a { color:#66efbf; }
+
+.react-link-preview {display:flex;align-items:center;gap:14px;padding:12px;background:#102c32;border:1px solid #3b796c;border-radius:12px;overflow:hidden;}
+.react-link-preview img {width:70px;height:70px;object-fit:cover;border-radius:8px;flex-shrink:0;}
+.react-link-preview div {min-width:0;overflow-wrap:anywhere;}
+.react-link-preview strong {display:block;font-size:14px;}
+.react-link-preview p {margin:4px 0;color:#bad7d0;}
+.react-link-preview small {color:#69edb7;}
