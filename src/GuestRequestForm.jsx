@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { getOrCreateGuestToken } from '../js/common.js';
+import { getOrCreateGuestToken, isHttpUrl } from '../js/common.js';
+import { getLinkPreview } from '../js/linkPreview.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, ETRANSFER_EMAIL } from '../js/config.js';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
@@ -8,7 +9,7 @@ const messages = {
   en: { artist:'Artist',song:'Song',url:'Song link (optional)',name:'Your name',message:'Dedication (optional)',submit:'Submit request',karaoke:'Karaoke',songRequest:'Song request',tip:'Tip',noTip:'No tip',payment:'Payment method',paypal:'PayPal',etransfer:'Interac e-Transfer',sender:'Exact e-transfer sender name',required:'A tip is required for this event.',missing:'Enter an artist and song, or use the full request page for a song link.',nameRequired:'Singer name is required.',paymentRequired:'Choose a payment method.',senderRequired:'Enter the name used for the transfer.',sending:'Submitting…',success:'Request received!',pending:'Waiting for DJ',error:'Could not submit your request.',paypalOpen:'Continue to PayPal',full:'Open full guest page',paused:'Requests are currently paused.',status:'Your request status',tipInfo:'Tips are confirmed by the DJ or PayPal.',checkoutError:'PayPal checkout could not start. Open your request page to retry.',retry:'Retry PayPal checkout',paid:'Payment confirmed',pendingPay:'Payment awaiting confirmation' },
   fr: { artist:'Artiste',song:'Chanson',url:'Lien de chanson (facultatif)',name:'Votre nom',message:'Dédicace (facultatif)',submit:'Envoyer la demande',karaoke:'Karaoké',songRequest:'Demande de chanson',tip:'Pourboire',noTip:'Sans pourboire',payment:'Mode de paiement',paypal:'PayPal',etransfer:'Virement Interac',sender:'Nom exact de l’expéditeur',required:'Un pourboire est requis pour cet événement.',missing:'Indiquez l’artiste et la chanson, ou utilisez la page complète pour un lien.',nameRequired:'Le nom du chanteur est obligatoire.',paymentRequired:'Choisissez un mode de paiement.',senderRequired:'Indiquez le nom utilisé pour le virement.',sending:'Envoi…',success:'Demande reçue !',pending:'En attente du DJ',error:'Impossible d’envoyer la demande.',paypalOpen:'Continuer vers PayPal',full:'Ouvrir la page complète',paused:'Les demandes sont en pause.',status:'Statut de votre demande',tipInfo:'Les pourboires sont confirmés par le DJ ou PayPal.',checkoutError:'Impossible d’ouvrir PayPal. Ouvrez la page de demande pour réessayer.',retry:'Réessayer le paiement PayPal',paid:'Paiement confirmé',pendingPay:'Paiement en attente de confirmation' },
 };
-const initial = { artist:'',song:'',name:'',message:'',sender:'' };
+const initial = { artist:'',song:'',url:'',name:'',message:'',sender:'' };
 export default function GuestRequestForm({ event, slug, language }) {
   const t = messages[language === 'fr' ? 'fr' : 'en'];
   const [mode,setMode] = useState('song');
@@ -21,6 +22,8 @@ export default function GuestRequestForm({ event, slug, language }) {
   const [status,setStatus] = useState('');
   const [paymentStatus,setPaymentStatus] = useState('');
   const [options,setOptions] = useState(null);
+  const [preview,setPreview] = useState(null);
+  const [previewBusy,setPreviewBusy] = useState(false);
   const guestUrl = new URL('/index.html',window.location.origin);
   guestUrl.searchParams.set('event',slug);
   const guestHref = guestUrl.pathname+guestUrl.search;
@@ -73,6 +76,26 @@ export default function GuestRequestForm({ event, slug, language }) {
     return () => { active=false;window.clearInterval(timer);supabase.removeChannel(channel); };
   },[request?.id]);
 
+  useEffect(() => {
+    const url=fields.url.trim();
+    if (!url || !isHttpUrl(url)) { setPreview(null);setPreviewBusy(false);return; }
+    let active=true;
+    setPreviewBusy(true);
+    const timer=window.setTimeout(() => {
+      getLinkPreview(url, { title:fields.song,subtitle:fields.artist }).then(data=>{
+        if(!active) return;
+        setPreview(data);
+        // Do not override artist/title explicitly typed by the guest.
+        setFields(old=>old.url.trim()===url ? ({
+          ...old,
+          artist:old.artist || (data?.artistName && data.artistName!=='Artist not provided' ? data.artistName.slice(0,120) : ''),
+          song:old.song || (data?.trackTitle && data.trackTitle!=='Linked song' ? data.trackTitle.slice(0,160) : ''),
+        }):old);
+      }).catch(()=>{if(active)setPreview(null);}).finally(()=>{if(active)setPreviewBusy(false);});
+    },500);
+    return ()=>{active=false;window.clearTimeout(timer);};
+  },[fields.url]);
+
   const change=(key,value)=>setFields(old=>({...old,[key]:value}));
   const visible=options?.tips_visible !== false;
   const required=visible && !!options?.tips_enabled;
@@ -104,7 +127,16 @@ export default function GuestRequestForm({ event, slug, language }) {
     setNotice('');
     if (!options) return;
     const artist=fields.artist.trim(), song=fields.song.trim(), name=fields.name.trim();
-    if (!artist || !song) return setNotice(t.missing);
+    const url=fields.url.trim();
+    if ((!artist || !song) && !url) return setNotice(t.missing);
+    if (url&&!isHttpUrl(url)) return setNotice(language==='fr'?'Lien invalide. Utilisez une adresse https:// valide.':'Invalid link. Please enter a valid https:// URL.');
+    // Mirror the original guest page's metadata fallbacks for link-only requests.
+    let finalArtist=artist, finalSong=song;
+    if (url&&(!finalArtist||!finalSong)) {
+      const metadata=preview?.url===url?preview:await getLinkPreview(url,{title:song,subtitle:artist});
+      finalArtist ||= metadata?.artistName || 'Linked song';
+      finalSong ||= metadata?.trackTitle || 'Song from link';
+    }
     if (mode==='karaoke'&&!name) return setNotice(t.nameRequired);
     if (required&&!amount) return setNotice(t.required);
     if (amount&&!method) return setNotice(t.paymentRequired);
@@ -114,8 +146,8 @@ export default function GuestRequestForm({ event, slug, language }) {
       const id=crypto.randomUUID();
       const token=getOrCreateGuestToken();
       const payload={
-        id,event_id:event.id,request_type:mode,artist:artist.slice(0,120),song:song.slice(0,160),
-        song_url:null,requester_name:name?name.slice(0,80):null,message:fields.message.trim().slice(0,200)||null,
+        id,event_id:event.id,request_type:mode,artist:finalArtist.slice(0,120),song:finalSong.slice(0,160),
+        song_url:url||null,requester_name:name?name.slice(0,80):null,message:fields.message.trim().slice(0,200)||null,
         tip_amount:amount||null,payment_method:amount?method:null,
         payment_status:amount?'pending':'not_required',
         payment_sender_name:method==='etransfer'?fields.sender.trim().slice(0,120):null,guest_token:token,
@@ -124,7 +156,7 @@ export default function GuestRequestForm({ event, slug, language }) {
       if(error) throw error;
       const saved={id,artist:payload.artist,song:payload.song,request_type:mode,tip_amount:payload.tip_amount,payment_method:payload.payment_method,payment_status:payload.payment_status,etransfer_email:ETRANSFER_EMAIL};
       localStorage.setItem('dropmysong_last_'+slug,JSON.stringify(saved));
-      setRequest(saved);setStatus('pending');setPaymentStatus(saved.payment_status);setFields(initial);setNotice(t.success);
+      setRequest(saved);setStatus('pending');setPaymentStatus(saved.payment_status);setFields(initial);setPreview(null);setNotice(t.success);
       if(amount&&method==='paypal'){
         // The established PayPal backend returns to index.html for verified capture.
         await openPayPal(saved);
@@ -139,8 +171,14 @@ export default function GuestRequestForm({ event, slug, language }) {
     </div>
     {!options ? <p><a href={guestHref}>{t.full} →</a></p> : !enabled ? <p role="status">{t.paused}</p> :
     <form onSubmit={submit}>
-      <label>{t.artist}<input required maxLength={120} value={fields.artist} onChange={e=>change('artist',e.target.value)}/></label>
-      <label>{t.song}<input required maxLength={160} value={fields.song} onChange={e=>change('song',e.target.value)}/></label>
+      <label>{t.artist}<input required={!fields.url.trim()} maxLength={120} value={fields.artist} onChange={e=>change('artist',e.target.value)}/></label>
+      <label>{t.song}<input required={!fields.url.trim()} maxLength={160} value={fields.song} onChange={e=>change('song',e.target.value)}/></label>
+      <label>{t.url}<input type="url" maxLength={2000} placeholder="https://www.youtube.com/watch?v=…" value={fields.url} onChange={e=>change('url',e.target.value)}/></label>
+      {previewBusy&&<p role="status" className="muted">{language==='fr'?'Recherche de la chanson…':'Looking up song information…'}</p>}
+      {preview&&fields.url.trim()===preview.url&&<div className="react-link-preview">
+        {preview.imageUrl&&<img src={preview.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer"/>}
+        <div><strong>{preview.trackTitle||preview.title}</strong><p>{preview.artistName||preview.providerName}</p><small>{preview.providerName}</small></div>
+      </div>}
       <label>{t.name}<input required={mode==='karaoke'} maxLength={80} value={fields.name} onChange={e=>change('name',e.target.value)}/></label>
       <label>{t.message}<textarea maxLength={200} value={fields.message} onChange={e=>change('message',e.target.value)}/></label>
       {visible && <fieldset><legend>{t.tip}{required?' *':''}</legend>
