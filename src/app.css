@@ -31,3 +31,19 @@ h1 span { color: #31dba0; }
 .event-preview p { margin: 0 0 14px; color: #b3d2d3; }
 .event-availability { display: flex; flex-wrap: wrap; gap: 10px 25px; color: #b9d7d5; margin-bottom: 18px; font-size: 14px; }
 .event-availability strong { color: #fff; }
+
+.react-guest-form { border-top: 1px solid #386c64; margin-top: 24px; padding-top: 20px; }
+.react-guest-form form { display:grid; gap: 16px; }
+.react-guest-form label { display: grid; gap: 7px; color: #d4ebec; font-size: 14px; font-weight: 700; }
+.react-guest-form input, .react-guest-form textarea, .react-guest-form select { width:100%; padding: 12px 14px; color: #f6fbff; border: 1px solid #547477; background: #101e29; border-radius: 9px; font: inherit; }
+.react-guest-form input:focus, .react-guest-form textarea:focus, .react-guest-form select:focus { outline: 2px solid #31dba0; outline-offset: 1px; }
+.react-guest-form fieldset { border: 1px solid #547477; border-radius: 12px; padding: 18px; display: grid; gap: 14px; }
+.react-guest-form legend { font-weight: 800; padding: 0 6px; }
+.request-types, .react-tip-options { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
+.request-types button, .react-tip-options button { border:1px solid #547477; border-radius: 9px; background: #172936; color:#e9ffff; padding: 10px 14px; cursor:pointer; font-weight:700; }
+.request-types button.active, .react-tip-options button.selected { background:#31dba0; color:#06251b; border-color:#31dba0; }
+.react-guest-form .module-link { border:none; cursor:pointer; font-size:15px; }
+.react-guest-form .module-link:disabled { opacity:.6; cursor:wait; }
+.form-feedback { padding:14px; border-radius:9px; background:#152d37; border:1px solid #416a71; margin-top:16px; }
+.full-guest-link { margin-top:18px; font-size:13px; }
+.react-guest-form a { color:#66efbf; }
