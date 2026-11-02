@@ -7,6 +7,18 @@
   <title>Drop My Song — Karaoke TV</title>
   <link rel="icon" href="./assets/icon-192.png" />
   <link rel="stylesheet" href="./css/styles.css" />
+  <style>
+    .karaoke-qr-small {display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;padding:6px;background:#fff;color:#06111b;border-radius:10px;font-weight:900;font-size:10px;text-align:center;line-height:1.2;letter-spacing:.03em}
+    .karaoke-qr-code {display:flex;align-items:center;justify-content:center;background:#fff;padding:5px;border-radius:6px}
+    .karaoke-qr-code img,.karaoke-qr-code canvas {display:block;max-width:100%;height:auto}
+    .karaoke-qr-small .karaoke-qr-code {width:90px;height:90px}
+    .karaoke-qr-large {display:flex;align-items:center;flex-direction:column;gap:10px;margin:20px auto 0;max-width:100%;text-align:center;color:#fff;overflow-wrap:anywhere}
+    .karaoke-qr-large .karaoke-qr-code {width:200px;height:200px}
+    .karaoke-qr-large strong {font-size:clamp(12px,1.6vw,19px);letter-spacing:.035em}
+    #karaokeQrUrl {font-size:12px;color:#b9d5e8}
+    .karaoke-qr-small.hidden,.karaoke-qr-large.hidden {display:none!important}
+    @media(max-width:650px) {.karaoke-qr-small .karaoke-qr-code {width:63px;height:63px}.karaoke-qr-small {font-size:8px;padding:4px}.karaoke-qr-large .karaoke-qr-code {width:135px;height:135px}}
+  </style>
 </head>
 <body class="karaoke-tv-body">
   <main class="karaoke-tv-shell">
@@ -17,6 +29,10 @@
         <h1 id="karaokeEventName">Drop My Song Karaoke</h1>
       </div>
       <button id="karaokeFullscreen" class="secondary-button karaoke-fullscreen-button" type="button">⛶ Fullscreen</button>
+      <aside id="karaokeQrSmall" class="karaoke-qr-small hidden" aria-label="Scan to request a song or karaoke">
+        <div id="karaokeQrSmallImage" class="karaoke-qr-code"></div>
+        <span>SCAN TO REQUEST</span>
+      </aside>
     </header>
 
     <section id="karaokeTvNotice" class="notice hidden" aria-live="polite"></section>
@@ -51,6 +67,7 @@
           <p class="eyebrow">WAITING FOR THE NEXT SINGER</p>
           <h2>Ready when you are.</h2>
           <p>The karaoke video will appear here automatically when DJ Maxo calls the next singer.</p>
+          <div id="karaokeQrLarge" class="karaoke-qr-large hidden"><div id="karaokeQrLargeImage" class="karaoke-qr-code"></div><strong>SCAN TO REQUEST A SONG OR KARAOKE</strong><span id="karaokeQrUrl"></span></div>
         </div>
         <div id="karaokeYoutubePlayer" class="karaoke-youtube-player hidden" aria-label="YouTube karaoke player"></div>
         <div id="karaokePlaybackOverlay" class="karaoke-playback-overlay hidden" aria-live="polite">
@@ -73,6 +90,7 @@
     </section>
   </main>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script type="module" src="./js/karaoke-player.js"></script>
   <script type="module" src="./js/register-sw.js"></script>
 </body>
