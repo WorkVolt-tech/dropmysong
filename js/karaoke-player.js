@@ -22,6 +22,33 @@ const playbackCopy = document.querySelector('#karaokePlaybackCopy');
 const nextSinger = document.querySelector('#karaokeNextSinger');
 const nextSong = document.querySelector('#karaokeNextSong');
 const fullscreenButton = document.querySelector('#karaokeFullscreen');
+const qrSmall = document.querySelector('#karaokeQrSmall');
+const qrLarge = document.querySelector('#karaokeQrLarge');
+const qrSmallImage = document.querySelector('#karaokeQrSmallImage');
+const qrLargeImage = document.querySelector('#karaokeQrLargeImage');
+const qrUrl = document.querySelector('#karaokeQrUrl');
+
+function showEventQr(slug) {
+  if (!slug) return;
+  const guestUrl = new URL('./index.html', window.location.href);
+  guestUrl.search = '';
+  guestUrl.searchParams.set('event', slug);
+  const url = guestUrl.toString();
+  qrSmallImage.replaceChildren();
+  qrLargeImage.replaceChildren();
+  if (typeof window.QRCode !== 'function') {
+    qrSmall.classList.add('hidden');
+    qrLarge.classList.add('hidden');
+    console.warn('DropMySong QR library could not load');
+    return;
+  }
+  new window.QRCode(qrSmallImage, { text:url, width:80, height:80, correctLevel:window.QRCode.CorrectLevel.M });
+  new window.QRCode(qrLargeImage, { text:url, width:190, height:190, correctLevel:window.QRCode.CorrectLevel.M });
+  qrUrl.textContent = guestUrl.host + guestUrl.pathname + guestUrl.search;
+  qrSmall.classList.remove('hidden');
+  qrLarge.classList.remove('hidden');
+}
+
 
 let currentVideoId = '';
 let currentYoutubeUrl = '';
@@ -290,7 +317,7 @@ async function loadEvent() {
 
   const { data, error } = await supabase
     .from('events')
-    .select('id,name')
+    .select('id,name,slug')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -300,6 +327,7 @@ async function loadEvent() {
   }
 
   eventName.textContent = data.name;
+  showEventQr(data.slug);
   hideNotice();
   return true;
 }
