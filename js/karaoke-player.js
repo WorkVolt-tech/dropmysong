@@ -42,7 +42,7 @@ function showEventQr(slug) {
     console.warn('DropMySong QR library could not load');
     return;
   }
-  new window.QRCode(qrSmallImage, { text:url, width:80, height:80, correctLevel:window.QRCode.CorrectLevel.M });
+  new window.QRCode(qrSmallImage, { text:url, width:50, height:50, correctLevel:window.QRCode.CorrectLevel.M });
   new window.QRCode(qrLargeImage, { text:url, width:190, height:190, correctLevel:window.QRCode.CorrectLevel.M });
   qrUrl.textContent = guestUrl.host + guestUrl.pathname + guestUrl.search;
   qrSmall.classList.remove('hidden');
