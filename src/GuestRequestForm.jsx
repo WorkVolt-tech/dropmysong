@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { getOrCreateGuestToken, isHttpUrl } from '../js/common.js';
 import { getLinkPreview } from '../js/linkPreview.js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY, ETRANSFER_EMAIL } from '../js/config.js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, VAPID_PUBLIC_KEY, ETRANSFER_EMAIL } from '../js/config.js';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 const messages = {
@@ -110,10 +110,34 @@ export default function GuestRequestForm({ event, slug, language }) {
     return ()=>{active=false;window.clearTimeout(timer);};
   },[fields.url]);
 
+  function pushKey(value) {
+    const base64=(value+'='.repeat((4-value.length%4)%4)).replace(/-/g,'+').replace(/_/g,'/');
+    return Uint8Array.from(atob(base64),c=>c.charCodeAt(0));
+  }
+
   async function enableKaraokeAlerts() {
     if (typeof Notification==='undefined' || !window.isSecureContext) return;
     const permission=await Notification.requestPermission();
     setNotificationsEnabled(permission==='granted');
+    if (permission!=='granted' || !request?.id || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    try {
+      const registration=await navigator.serviceWorker.ready;
+      let subscription=await registration.pushManager.getSubscription();
+      if (!subscription) subscription=await registration.pushManager.subscribe({
+        userVisibleOnly:true,applicationServerKey:pushKey(VAPID_PUBLIC_KEY),
+      });
+      const details=subscription.toJSON();
+      const {error}=await supabase.from('push_subscriptions').insert({
+        request_id:request.id,guest_token:getOrCreateGuestToken(),
+        endpoint:details.endpoint,p256dh:details.keys?.p256dh,auth:details.keys?.auth,
+        language,page_url:location.href,
+      });
+      if(error) throw error;
+      localStorage.setItem('dropmysong_push_request_'+slug,request.id);
+      setNotice(t.alertsEnabled);
+    } catch(error) {
+      setNotice(error?.message||t.error);
+    }
   }
 
   const change=(key,value)=>setFields(old=>({...old,[key]:value}));
