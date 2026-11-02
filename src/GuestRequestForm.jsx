@@ -18,6 +18,7 @@ export default function GuestRequestForm({ event, slug, language }) {
   const [method,setMethod] = useState('');
   const [busy,setBusy] = useState(false);
   const [notice,setNotice] = useState('');
+  const [returnProcessing,setReturnProcessing] = useState(false);
   const [request,setRequest] = useState(null);
   const [status,setStatus] = useState('');
   const [paymentStatus,setPaymentStatus] = useState('');
@@ -145,6 +146,43 @@ export default function GuestRequestForm({ event, slug, language }) {
   const required=visible && !!options?.tips_enabled;
   const enabled=mode==='karaoke'?options?.karaoke_enabled !== false:event.requests_enabled !== false;
 
+  useEffect(() => {
+    const params=new URLSearchParams(window.location.search);
+    const mode=params.get('paypal');
+    if (!mode) return;
+    const clean=() => {
+      const url=new URL(window.location.href);
+      for(const key of ['paypal','request','token','PayerID']) url.searchParams.delete(key);
+      window.history.replaceState({},'',url);
+    };
+    if(mode==='cancel') {
+      setNotice(language==='fr'?'Paiement annulé. Vous pouvez réessayer.':'Payment cancelled. You can try again.');
+      clean();
+      return;
+    }
+    if(mode!=='return') return;
+    const id=params.get('request'),order=params.get('token');
+    if(!id||!order) {
+      setNotice(t.checkoutError);clean();return;
+    }
+    let active=true;
+    setReturnProcessing(true);
+    (async()=>{
+      try {
+        const response=await fetch(SUPABASE_URL+'/functions/v1/paypal-payment',{
+          method:'POST',
+          headers:{'Content-Type':'application/json',apikey:SUPABASE_ANON_KEY,Authorization:'Bearer '+SUPABASE_ANON_KEY},
+          body:JSON.stringify({action:'capture',request_id:id,order_id:order,guest_token:getOrCreateGuestToken(),language}),
+        });
+        const data=await response.json().catch(()=>null);
+        if(!response.ok||!data?.confirmed) throw Error(data?.error||t.checkoutError);
+        if(active){setPaymentStatus('confirmed');setNotice(t.paid);}
+      }catch(error){if(active)setNotice(error?.message||t.checkoutError);}
+      finally{if(active)setReturnProcessing(false);clean();}
+    })();
+    return ()=>{active=false;};
+  },[slug]);
+
   async function openPayPal(savedRequest) {
     const token=getOrCreateGuestToken();
     const response=await fetch(SUPABASE_URL+'/functions/v1/paypal-payment',{
@@ -159,7 +197,7 @@ export default function GuestRequestForm({ event, slug, language }) {
   }
 
   async function retryPayPal() {
-    if (!request || busy) return;
+    if (!request || busy || returnProcessing) return;
     setBusy(true);setNotice('');
     try { await openPayPal(request); }
     catch(error) { setNotice(error?.message||t.checkoutError); }
@@ -234,6 +272,7 @@ export default function GuestRequestForm({ event, slug, language }) {
       </fieldset>}
       <button className="module-link" type="submit" disabled={busy}>{busy?t.sending:t.submit}</button>
     </form>}
+    {returnProcessing&&<p role="status" className="form-feedback">{language==='fr'?'Vérification du paiement PayPal…':'Verifying PayPal payment…'}</p>}
     {notice&&<p role="status" className="form-feedback">{notice}</p>}
     {readyMessage&&<div className="form-feedback karaoke-ready-alert" role="alert">🎤 {readyMessage}</div>}
     {request?.request_type==='karaoke' && typeof Notification!=='undefined' && !notificationsEnabled && <button type="button" className="alert-enable" onClick={enableKaraokeAlerts}>{t.enableAlert}</button>}
