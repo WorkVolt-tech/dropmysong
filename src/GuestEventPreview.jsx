@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import GuestRequestForm from './GuestRequestForm.jsx';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../js/config.js';
 
@@ -39,6 +40,7 @@ export default function GuestEventPreview({ slug, language }) {
         <span>{fr ? 'Karaoké' : 'Karaoke'}: <strong>{event.karaoke_enabled === false ? (fr ? 'En pause' : 'Paused') : (fr ? 'Disponible' : 'Available')}</strong></span>
       </div>
       <a className="module-link" href={guestUrl.pathname + guestUrl.search}>{fr ? 'Faire une demande' : 'Request a song'} <span aria-hidden="true">→</span></a>
+    <GuestRequestForm event={event} slug={slug} language={language} />
     </section>
   );
 }
