@@ -54,3 +54,6 @@ h1 span { color: #31dba0; }
 .react-link-preview strong {display:block;font-size:14px;}
 .react-link-preview p {margin:4px 0;color:#bad7d0;}
 .react-link-preview small {color:#69edb7;}
+
+.karaoke-ready-alert {border:2px solid #31dba0;background:#124337;color:#f4fff8;font-weight:800;font-size:18px;}
+.alert-enable {padding:11px 16px;border:1px solid #31dba0;border-radius:10px;color:#31dba0;background:#13332e;cursor:pointer;margin-top:14px;font-weight:750;}
