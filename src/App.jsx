@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import GuestEventPreview from './GuestEventPreview.jsx';
 
 const modules = [
   { key: 'guest', icon: '♫', en: 'Song requests', fr: 'Demandes de chansons', enDesc: 'Request a song, follow its status and send a tip.', frDesc: 'Demandez une chanson, suivez son statut et laissez un pourboire.', path: '/index.html' },
@@ -48,6 +49,7 @@ export default function App() {
         <h1>Drop<span>My</span>Song</h1>
         <p className="tagline">{copy.tagline}</p>
         <p className="intro">{copy.description}</p>
+        {event && <GuestEventPreview slug={event} language={language} />}
         <div className="module-grid">
           {modules.map(module => (
             <article className="module" key={module.key}>
