@@ -30,6 +30,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: resolve('index.html'),
+        app: resolve('app.html'),
         dj: resolve('dj.html'),
         host: resolve('host.html'),
         karaoke: resolve('karaoke.html'),
