@@ -8,16 +8,17 @@
   <link rel="icon" href="./assets/icon-192.png" />
   <link rel="stylesheet" href="./css/styles.css" />
   <style>
-    .karaoke-qr-small {display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;padding:6px;background:#fff;color:#06111b;border-radius:10px;font-weight:900;font-size:10px;text-align:center;line-height:1.2;letter-spacing:.03em}
+    .karaoke-tv-header {position:relative;}
+    .karaoke-qr-small {position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5;display:flex;flex-direction:column;align-items:center;gap:2px;padding:3px;background:#fff;color:#06111b;border-radius:7px;font-weight:900;font-size:8px;text-align:center;line-height:1.1;letter-spacing:.02em;pointer-events:none}
     .karaoke-qr-code {display:flex;align-items:center;justify-content:center;background:#fff;padding:5px;border-radius:6px}
     .karaoke-qr-code img,.karaoke-qr-code canvas {display:block;max-width:100%;height:auto}
-    .karaoke-qr-small .karaoke-qr-code {width:90px;height:90px}
+    .karaoke-qr-small .karaoke-qr-code {width:60px;height:60px}
     .karaoke-qr-large {display:flex;align-items:center;flex-direction:column;gap:10px;margin:20px auto 0;max-width:100%;text-align:center;color:#fff;overflow-wrap:anywhere}
     .karaoke-qr-large .karaoke-qr-code {width:200px;height:200px}
     .karaoke-qr-large strong {font-size:clamp(12px,1.6vw,19px);letter-spacing:.035em}
     #karaokeQrUrl {font-size:12px;color:#b9d5e8}
     .karaoke-qr-small.hidden,.karaoke-qr-large.hidden {display:none!important}
-    @media(max-width:650px) {.karaoke-qr-small .karaoke-qr-code {width:63px;height:63px}.karaoke-qr-small {font-size:8px;padding:4px}.karaoke-qr-large .karaoke-qr-code {width:135px;height:135px}}
+    @media(max-width:650px) {.karaoke-qr-small .karaoke-qr-code {width:50px;height:50px}.karaoke-qr-small {font-size:8px;padding:4px}.karaoke-qr-large .karaoke-qr-code {width:135px;height:135px}}
   </style>
 </head>
 <body class="karaoke-tv-body">
