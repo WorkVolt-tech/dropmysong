@@ -24,3 +24,10 @@ h1 span { color: #31dba0; }
 .module-link:hover, .module-link:focus-visible { background: #63efba; }
 .notice { margin-top: 28px; color: #9eb2c7; font-size: 13px; }
 @media(max-width: 620px) { .module-grid { grid-template-columns: 1fr; } .module { min-height: 195px; } .app-header img { width: 105px; } main { padding-top: 28px; } }
+
+.event-preview { margin-top: 26px; border: 1px solid #2a755f; border-radius: 20px; padding: 22px 24px; background: linear-gradient(130deg, #153b35, #132436); }
+.event-label { font-size: 11px; font-weight: 850; letter-spacing: .16em; color: #55e6b6; }
+.event-preview h2 { margin: 9px 0 4px; font-size: clamp(21px,4vw,31px); }
+.event-preview p { margin: 0 0 14px; color: #b3d2d3; }
+.event-availability { display: flex; flex-wrap: wrap; gap: 10px 25px; color: #b9d7d5; margin-bottom: 18px; font-size: 14px; }
+.event-availability strong { color: #fff; }
