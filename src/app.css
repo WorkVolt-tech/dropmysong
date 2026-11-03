@@ -83,3 +83,5 @@ h1 span { color: #31dba0; }
 .dj-queue-meta small{display:block;margin-top:5px;color:#bacadd}
 .dj-queue-empty,.dj-queue-hint{color:#9eb3c7;font-size:13px}
 .dj-queue-hint{grid-column:1/-1}
+
+.dj-queue-item{flex-wrap:wrap}.dj-song-controls{display:flex;flex-wrap:wrap;gap:7px;width:100%;border-top:1px solid #29455c;padding-top:9px}.dj-song-controls button{border:1px solid #3f6c81;background:#153e4d;color:#ecffff;border-radius:8px;padding:7px 10px;font-weight:700;cursor:pointer}.dj-song-controls button:disabled{opacity:.4;cursor:not-allowed}.dj-song-controls button:hover:not(:disabled){border-color:#31dba0}
