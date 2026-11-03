@@ -22,6 +22,7 @@ export default function GuestRequestForm({ event, slug, language }) {
   const [request,setRequest] = useState(null);
   const [status,setStatus] = useState('');
   const [paymentStatus,setPaymentStatus] = useState('');
+  const [refundState,setRefundState] = useState('none');
   const [options,setOptions] = useState(null);
   const [preview,setPreview] = useState(null);
   const [previewBusy,setPreviewBusy] = useState(false);
@@ -99,6 +100,15 @@ export default function GuestRequestForm({ event, slug, language }) {
         const row=data[0];
         setStatus(row.status || '');
         setPaymentStatus(row.payment_status || '');
+        if (request.payment_method === 'paypal') {
+          const result=await supabase.rpc('get_guest_refund_status',{
+            p_request_id:request.id,p_guest_token:token,
+          });
+          if (active && !result.error && result.data?.length) {
+            setPaymentStatus(result.data[0].payment_status || '');
+            setRefundState(result.data[0].refund_state || 'none');
+          }
+        }
         if ((request.request_type||'song')==='karaoke' && row.status==='playing') {
           const ack=await supabase.rpc('get_karaoke_arrival',{p_request_id:request.id,p_guest_token:token});
           if (active && !ack.error) setOnMyWay(Boolean(ack.data));
@@ -341,6 +351,14 @@ export default function GuestRequestForm({ event, slug, language }) {
     </form>}
     {returnProcessing&&<p role="status" className="form-feedback">{language==='fr'?'Vérification du paiement PayPal…':'Verifying PayPal payment…'}</p>}
     {notice&&<p role="status" className="form-feedback">{notice}</p>}
+    {request?.payment_method==='paypal'&&status==='rejected'&&
+      <p className="form-feedback" role="status">
+        {paymentStatus==='refunded'
+          ? (language==='fr'?'✓ Remboursement PayPal confirmé':'✓ PayPal refund confirmed')
+          : paymentStatus==='refund_pending'
+            ? (language==='fr'?'Remboursement PayPal en cours':'PayPal refund processing')
+            : (language==='fr'?'Demande refusée':'Request rejected')}
+      </p>}
     {readyMessage&&!onMyWay&&<div className="form-feedback karaoke-ready-alert" role="alert">🎤 {readyMessage}<button type="button" className="module-link" disabled={busy} onClick={confirmArrival}>{language==='fr'?"J'arrive!":"I'm Coming!"}</button></div>}
     {request?.request_type==='karaoke'&&status==='playing'&&onMyWay&&<p className="form-feedback" role="status">✓ {language==='fr'?'En route — confirmé':'On My Way — Confirmed'}</p>}
     {request?.request_type==='karaoke' && typeof Notification!=='undefined' && !notificationsEnabled && <button type="button" className="alert-enable" onClick={enableKaraokeAlerts}>{t.enableAlert}</button>}
