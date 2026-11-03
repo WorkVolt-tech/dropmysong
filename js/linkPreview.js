@@ -88,6 +88,7 @@ function titleFromPath(url) {
     .replace(/[-_]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  if (['watch','embed','shorts','live'].includes(last.toLowerCase())) return '';
   return last && !/^[a-z0-9]{10,}$/i.test(last) ? last : '';
 }
 
@@ -116,6 +117,25 @@ function inferArtistAndTrack(title = '', creator = '') {
 
 async function resolveRemotePreview(url, provider) {
   if (provider.key === 'youtube') {
+    // Resolve metadata on the server: browsers often block direct YouTube oEmbed via CORS.
+    let serverMetadata = null;
+    try {
+      const {data,error} = await supabase.functions.invoke('link-metadata', { body: { url:url.href } });
+      if (!error && data?.trackTitle) serverMetadata = data;
+    } catch (error) {
+      console.debug('YouTube metadata server lookup failed:', error?.message || error);
+    }
+    if (serverMetadata) {
+      const inferred = inferArtistAndTrack(serverMetadata.trackTitle, serverMetadata.artistName);
+      return {
+        title: serverMetadata.trackTitle,
+        subtitle: inferred.artistName || serverMetadata.artistName || '',
+        trackTitle: inferred.trackTitle || serverMetadata.trackTitle,
+        artistName: inferred.artistName || serverMetadata.artistName || '',
+        imageUrl: serverMetadata.imageUrl || '',
+        providerName: 'YouTube',
+      };
+    }
     const data = await fetchJson(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(url.href)}`);
     const inferred = inferArtistAndTrack(data.title || '', data.author_name || '');
     return {
