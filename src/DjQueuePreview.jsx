@@ -8,6 +8,8 @@ export default function DjQueuePreview({eventId,language}){
   const [items,setItems]=useState([]);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(true);
+  const [updating,setUpdating]=useState('');
+  const [notice,setNotice]=useState('');
   const refresh=useCallback(async()=>{
     const {data,error}=await supabase.from('song_requests')
       .select('id,request_type,artist,song,requester_name,status,payment_status,tip_amount,sort_order,created_at')
@@ -28,12 +30,28 @@ export default function DjQueuePreview({eventId,language}){
     return()=>{active=false;window.clearInterval(timer);supabase.removeChannel(channel);};
   },[eventId,refresh]);
 
+  async function updateSong(row,next) {
+    if(updating || (row.request_type||'song')!=='song') return;
+    const transitions={pending:['accepted','rejected','cant_find'],cant_find:['accepted','rejected'],accepted:['playing','played'],playing:['played','accepted']};
+    if(!transitions[row.status]?.includes(next)) return;
+    if(row.payment_status==='pending' && ['accepted','playing','played'].includes(next)){
+      setNotice(fr?'Paiement à confirmer.':'Payment must be confirmed first.');return;
+    }
+    setUpdating(row.id);setNotice('');
+    const changes={status:next,updated_at:new Date().toISOString()};
+    if(next==='played') changes.played_at=new Date().toISOString();
+    const {data,error}=await supabase.from('song_requests').update(changes)
+      .eq('id',row.id).eq('event_id',eventId).eq('status',row.status).select('id');
+    if(error)setNotice(error.message);
+    else if(!data?.length)setNotice(fr?'Demande modifiée. Actualisation…':'Request changed. Refreshing…');
+    await refresh();setUpdating('');
+  }
   const sections=[{type:'song',title:fr?'Demandes de chansons':'Song requests'},{type:'karaoke',title:fr?'File karaoké':'Karaoke queue'}];
   return <div className="dj-queue-preview" aria-label={fr?'File de demandes':'Request queue'}>
     {busy&&<p role="status">{fr?'Chargement des demandes…':'Loading requests…'}</p>}
     {error&&<p role="alert">{error}</p>}
     {!error&&sections.map(section=>{
-      const rows=items.filter(x=>(x.request_type||'song')===section.type&&['pending','accepted','playing'].includes(x.status));
+      const rows=items.filter(x=>(x.request_type||'song')===section.type&&['pending','cant_find','accepted','playing'].includes(x.status));
       return <section key={section.type}>
         <h3>{section.title} <small>{rows.length}</small></h3>
         {!rows.length?<p className="dj-queue-empty">{fr?'Aucune demande active.':'No active requests.'}</p>:
@@ -41,9 +59,25 @@ export default function DjQueuePreview({eventId,language}){
           <div><strong>{row.artist} — {row.song}</strong>
           <p>{row.requester_name|| (fr?'Invité':'Guest')}</p></div>
           <div className="dj-queue-meta"><span>{row.status}</span>{Number(row.tip_amount)>0&&<small>{Number(row.tip_amount).toLocaleString(fr?'fr-CA':'en-CA',{style:'currency',currency:'CAD'})} · {row.payment_status||'pending'}</small>}</div>
+          {section.type==='song'&&<div className="dj-song-controls">
+            {(row.status==='pending'||row.status==='cant_find')&&<>
+              <button disabled={!!updating||row.payment_status==='pending'} onClick={()=>updateSong(row,'accepted')}>{fr?'Accepter':'Accept'}</button>
+              <button disabled={!!updating} onClick={()=>updateSong(row,'rejected')}>{fr?'Refuser':'Reject'}</button>
+              {row.status==='pending'&&<button disabled={!!updating} onClick={()=>updateSong(row,'cant_find')}>{fr?'Introuvable':"Can't find"}</button>}
+            </>}
+            {row.status==='accepted'&&<>
+              <button disabled={!!updating||row.payment_status==='pending'} onClick={()=>updateSong(row,'playing')}>{fr?'En cours':'Playing'}</button>
+              <button disabled={!!updating||row.payment_status==='pending'} onClick={()=>updateSong(row,'played')}>{fr?'Terminé':'Played'}</button>
+            </>}
+            {row.status==='playing'&&<>
+              <button disabled={!!updating||row.payment_status==='pending'} onClick={()=>updateSong(row,'played')}>{fr?'Terminé':'Played'}</button>
+              <button disabled={!!updating} onClick={()=>updateSong(row,'accepted')}>{fr?'Retour':'Back to queue'}</button>
+            </>}
+          </div>}
         </article>)}</div>}
       </section>;
     })}
-    <p className="dj-queue-hint">{fr?'Aperçu en lecture seule. Utilisez le tableau de bord pour accepter, rejeter ou jouer les demandes.':'Read-only preview. Use the DJ dashboard to accept, reject or play requests.'}</p>
+    {notice&&<p role="status" className="dj-queue-hint">{notice}</p>}
+    <p className="dj-queue-hint">{fr?'Les chansons sont contrôlables ici. Utilisez le tableau de bord pour le karaoké et les paiements.':'Song controls are available here. Use the original dashboard for karaoke and payment confirmations.'}</p>
   </div>;
 }
