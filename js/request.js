@@ -67,6 +67,21 @@ const guestRequestsKey = `dropmysong_requests_${eventSlug}`;
 const activeGuestStatuses = new Set(['pending','cant_find','accepted','playing']);
 const otherGuestRequests = document.querySelector('#otherGuestRequests');
 let guestRequestTimer = null;
+const notifiedKaraokeVersions = new Map();
+function notifyKaraokeCall(row) {
+  if (!row?.id || row.request_type !== 'karaoke' || row.status !== 'playing') return;
+  const version = row.updated_at || 'called';
+  const key = `dropmysong_karaoke_called_${row.id}`;
+  if (notifiedKaraokeVersions.get(row.id) === version) return;
+  // Persist the displayed call so refreshing the guest page doesn't repeatedly interrupt them.
+  let previous = '';
+  try { previous = sessionStorage.getItem(key) || ''; } catch {}
+  if (previous === version) { notifiedKaraokeVersions.set(row.id, version); return; }
+  notifiedKaraokeVersions.set(row.id, version);
+  try { sessionStorage.setItem(key, version); } catch {}
+  announceKaraokeReady(row);
+}
+
 
 function savedGuestRequests() {
   try {
@@ -133,6 +148,11 @@ async function renderGuestRequests() {
   }));
   // Keep the complete local history, but show only requests still awaiting or being performed.
   localStorage.setItem(guestRequestsKey, JSON.stringify(fetched));
+  // A guest can submit many karaoke requests. A call must alert them even if
+  // that karaoke request is not the most recently submitted request.
+  for (const item of fetched) {
+    if (item.id !== currentRequest?.id) notifyKaraokeCall(item);
+  }
   const other = fetched.filter(item => item.id !== currentRequest?.id && activeGuestStatuses.has(item.status || 'pending'));
   otherGuestRequests.replaceChildren();
   for (const item of other) {
@@ -149,7 +169,7 @@ async function renderGuestRequests() {
     badge.textContent = item.status || 'pending';
     const status = document.createElement('p');
     status.className = 'muted';
-    status.textContent = item.status === 'playing' ? 'Currently playing / singer called' :
+    status.textContent = item.status === 'playing' ? (item.request_type === 'karaoke' ? '🎤 YOU’RE UP! Come to the karaoke area now.' : 'Currently playing') :
       item.status === 'accepted' ? 'Approved — waiting in the queue' :
       item.status === 'cant_find' ? 'DJ needs help locating this version' :
       'Waiting for DJ approval';
@@ -874,7 +894,7 @@ async function refreshStatus() {
 
   if ((currentRequest.request_type || requestType) === 'karaoke' && row.status === 'playing' && readyAnnouncementVersion !== row.updated_at) {
     readyAnnouncementVersion = row.updated_at;
-    announceKaraokeReady(row);
+    notifyKaraokeCall({ ...currentRequest, ...row, id: currentRequest.id });
   }
 
   if (row.status === 'played') loadRecentPlayed();
@@ -1094,7 +1114,7 @@ async function announceKaraokeReady(row) {
           body: `${row.artist} — ${row.song}. ${t('guest.karaokeReadyBody')}`,
           icon: './assets/icon-192.png',
           badge: './assets/icon-192.png',
-          tag: `karaoke-${currentRequest.id}`,
+          tag: `karaoke-${row.id}`,
           renotify: true,
         });
       } else {
