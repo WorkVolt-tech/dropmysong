@@ -430,6 +430,9 @@ function renderHostQueues() {
   readyList.querySelectorAll('[data-host-call]').forEach(button => {
     button.addEventListener('click', () => markCalled(button.dataset.hostCall));
   });
+  readyList.querySelectorAll('[data-host-start-karaoke]').forEach(button => {
+    button.addEventListener('click', () => startHostKaraoke(button));
+  });
 }
 
 function requesterLabel(row) {
@@ -484,6 +487,9 @@ function renderReadyCard(row) {
       ${call
         ? `<p class="muted">${escapeHtml(t('host.calledBy', { email: call.host_email }))}</p>`
         : `<button class="primary-button host-called-button" type="button" data-host-call="${row.id}">${escapeHtml(t('host.markCalled'))}</button>`}
+      ${row.request_type === 'karaoke' && karaokeTrackReady(row)
+        ? `<button class="primary-button host-karaoke-start" type="button" data-host-start-karaoke="${row.id}" style="width:100%;margin-top:12px">${escapeHtml(getLanguage() === 'fr' ? '▶ Démarrer le karaoké' : '▶ Start Karaoke')}</button>`
+        : ''}
     </article>`;
 }
 
@@ -503,6 +509,45 @@ function renderQueueCard(row) {
       <h3>${escapeHtml(requesterLabel(row))}</h3>
       <p class="host-song-line">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</p>
     </article>`;
+}
+
+async function startHostKaraoke(button) {
+  const row = requests.find(item => item.id === button.dataset.hostStartKaraoke);
+  if (!row || row.request_type !== 'karaoke' || row.status !== 'playing' || !activeAssignment) return;
+  button.disabled = true;
+  const original = button.textContent;
+  button.textContent = getLanguage() === 'fr' ? 'Démarrage…' : 'Starting…';
+  try {
+    let accessToken = null;
+    if (!inviteToken) {
+      const {data} = await supabase.auth.getSession();
+      accessToken = data?.session?.access_token;
+      if (!accessToken) throw new Error('Sign in to your MC account again.');
+    }
+    const response = await fetch(SUPABASE_URL + '/functions/v1/host-karaoke-control', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        apikey:SUPABASE_ANON_KEY,
+        Authorization:'Bearer ' + (accessToken || SUPABASE_ANON_KEY),
+      },
+      body:JSON.stringify({
+        event_id:activeAssignment.event_id,
+        request_id:row.id,
+        ...(inviteToken ? {invite_token:inviteToken} : {}),
+      }),
+    });
+    const data=await response.json().catch(()=>null);
+    if (!response.ok || !data?.ok) throw new Error(data?.error || 'Could not start Karaoke TV.');
+    showHostNotice(getLanguage() === 'fr'
+      ? 'Lecture envoyée à Karaoke TV.'
+      : 'Play command sent to Karaoke TV.', 'success');
+  } catch(error) {
+    showHostNotice(error?.message || 'Could not start karaoke.', 'error');
+  } finally {
+    button.disabled=false;
+    button.textContent=original;
+  }
 }
 
 async function markCalled(requestId) {
