@@ -121,7 +121,7 @@ export default {
       const [{ data: requests, error: requestError }, { data: calls, error: callsError }] = await Promise.all([
         admin
           .from('song_requests')
-          .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at,song_url,karaoke_video_url')
+          .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at,song_url,karaoke_video_url,singer_confirmed_at')
           .eq('event_id', invite.event_id)
           .in('status', ['pending', 'accepted', 'playing', 'cant_find'])
           .order('sort_order', { ascending: true })
@@ -151,6 +151,7 @@ export default {
           sort_order: row.sort_order,
           created_at: row.created_at,
           updated_at: row.updated_at,
+          singer_confirmed_at: row.singer_confirmed_at,
           karaoke_ready: row.request_type === 'karaoke'
             ? !!youtubeVideoId(row.karaoke_video_url || row.song_url || '')
             : null,
