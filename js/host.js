@@ -386,7 +386,7 @@ async function loadRequests() {
   if (!activeAssignment) return;
   const { data, error } = await supabase
     .from('song_requests')
-    .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at,song_url,karaoke_video_url')
+    .select('id,event_id,request_type,artist,song,requester_name,status,sort_order,created_at,updated_at,song_url,karaoke_video_url,singer_confirmed_at')
     .eq('event_id', activeAssignment.event_id)
     .in('status', ['pending', 'accepted', 'playing', 'cant_find'])
     .order('sort_order', { ascending: true })
@@ -480,6 +480,7 @@ function renderReadyCard(row) {
         <span class="host-type-badge">${escapeHtml(typeLabel(row))}</span>
         ${karaokeReadinessBadge(row)}
         ${call ? `<span class="host-called-badge">✓ ${escapeHtml(t('host.called'))}</span>` : ''}
+        ${row.request_type === 'karaoke' && row.singer_confirmed_at ? `<span class="host-called-badge">✓ ${escapeHtml(getLanguage() === 'fr' ? 'En route' : 'On My Way')}</span>` : ''}
       </div>
       <h3>${escapeHtml(requesterLabel(row))}</h3>
       <p class="host-song-line">${escapeHtml(row.artist)} — ${escapeHtml(row.song)}</p>
