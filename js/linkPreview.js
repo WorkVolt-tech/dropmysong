@@ -256,6 +256,19 @@ export async function getLinkPreview(value, fallback = {}) {
       console.debug('DropMySong link preview fallback:', error?.message || error);
     }
 
+    // A YouTube video ID is not a song title. Flag unavailable metadata so the
+    // form can ask the guest for the actual artist and title instead of saving
+    // placeholders such as "Linked song" or the URL path "watch".
+    if (provider.key === 'youtube' && !preview.trackTitle) {
+      preview.needsManualMetadata = true;
+      preview.trackTitle = '';
+      preview.artistName = '';
+      preview.title = '';
+      preview.subtitle = '';
+      preview.imageUrl ||= fallbackArtwork(provider);
+      return preview;
+    }
+
     if (!preview.trackTitle) {
       const inferred = inferArtistAndTrack(preview.title, preview.subtitle);
       preview.trackTitle = inferred.trackTitle || titleFromPath(url) || 'Linked song';
