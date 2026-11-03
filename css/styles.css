@@ -1177,6 +1177,24 @@ select:hover {
   color: #9ddfff;
   font-size: .84rem;
 }
+.nav-notification {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #e53a65;
+  color: white;
+  font-size: .76rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  box-shadow: 0 0 0 2px rgba(229,58,101,.15);
+}
+.nav-notification.hidden { display: none; }
 .nav-item[data-tab="queue"]::before { content: "♫"; }
 .nav-item[data-tab="karaoke"]::before { content: "🎤"; font-size: .78rem; }
 .nav-item[data-tab="played"]::before { content: "✓"; }
