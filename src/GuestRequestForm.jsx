@@ -196,6 +196,22 @@ export default function GuestRequestForm({ event, slug, language }) {
     window.location.assign(result.approve_url);
   }
 
+  async function cancelCurrentRequest() {
+    if (!request?.id || busy || returnProcessing || Number(request.tip_amount||0)>0 || !['pending','cant_find','accepted'].includes(status||'pending')) return;
+    if (!window.confirm(language==='fr'?'Annuler cette demande ?':'Cancel this request?')) return;
+    setBusy(true);
+    try {
+      const {data,error}=await supabase.rpc('cancel_guest_request',{
+        p_request_id:request.id,p_guest_token:getOrCreateGuestToken(),
+      });
+      if (error || !data) throw Error(error?.message || (language==='fr'?'Annulation impossible.':'Cannot cancel this request.'));
+      setStatus('rejected');
+      setNotice(language==='fr'?'Votre demande a été annulée.':'Your request was cancelled.');
+      localStorage.setItem('dropmysong_last_'+slug,JSON.stringify({...request,status:'rejected'}));
+    } catch(error){setNotice(error.message||t.error);}
+    finally{setBusy(false);}
+  }
+
   async function retryPayPal() {
     if (!request || busy || returnProcessing) return;
     setBusy(true);setNotice('');
@@ -216,8 +232,17 @@ export default function GuestRequestForm({ event, slug, language }) {
     let finalArtist=artist, finalSong=song;
     if (url&&(!finalArtist||!finalSong)) {
       const metadata=preview?.url===url?preview:await getLinkPreview(url,{title:song,subtitle:artist});
-      finalArtist ||= metadata?.artistName || 'Linked song';
-      finalSong ||= metadata?.trackTitle || 'Song from link';
+      if (metadata?.needsManualMetadata || !metadata?.trackTitle) {
+        setNotice(language==='fr'
+          ? 'Titre YouTube introuvable. Entrez le nom de l’artiste et de la chanson.'
+          : 'YouTube title unavailable. Enter the artist and song manually.');
+        return;
+      }
+      finalArtist ||= metadata?.artistName || '';
+      finalSong ||= metadata?.trackTitle || '';
+    }
+    if (!finalArtist || !finalSong || /^(Artist not provided|Linked song)$/i.test(finalArtist) || /^(watch|Linked song|Song from link)$/i.test(finalSong)) {
+      return setNotice(language==='fr'?'Entrez un véritable artiste et titre.':'Enter the actual artist and song title.');
     }
     if (mode==='karaoke'&&!name) return setNotice(t.nameRequired);
     if (required&&!amount) return setNotice(t.required);
@@ -276,7 +301,7 @@ export default function GuestRequestForm({ event, slug, language }) {
     {notice&&<p role="status" className="form-feedback">{notice}</p>}
     {readyMessage&&<div className="form-feedback karaoke-ready-alert" role="alert">🎤 {readyMessage}</div>}
     {request?.request_type==='karaoke' && typeof Notification!=='undefined' && !notificationsEnabled && <button type="button" className="alert-enable" onClick={enableKaraokeAlerts}>{t.enableAlert}</button>}
-    {request&&<div className="form-feedback" role="status"><strong>{t.status}: {status||t.pending}</strong><p>{request.artist} — {request.song}</p>{request.payment_method==='paypal'&&<><p>{paymentStatus==='confirmed'?t.paid:t.pendingPay}</p>{paymentStatus!=='confirmed'&&<button type="button" className="module-link" onClick={retryPayPal} disabled={busy}>{t.retry}</button>}</>}<p><a href={guestHref}>{t.full} →</a></p></div>}
+    {request&&['pending','cant_find','accepted','playing'].includes(status||'pending')&&<div className="form-feedback" role="status"><strong>{t.status}: {status||t.pending}</strong><p>{request.artist} — {request.song}</p>{request.payment_method==='paypal'&&<><p>{paymentStatus==='confirmed'?t.paid:t.pendingPay}</p>{paymentStatus!=='confirmed'&&<button type="button" className="module-link" onClick={retryPayPal} disabled={busy}>{t.retry}</button>}</>}{Number(request.tip_amount||0)===0&&['pending','cant_find','accepted'].includes(status||'pending')&&<button className="alert-enable" type="button" onClick={cancelCurrentRequest} disabled={busy}>{language==='fr'?'Annuler la demande':'Cancel request'}</button>}<p><a href={guestHref}>{t.full} →</a></p></div>}
     <p className="full-guest-link"><a href={guestHref}>{t.full} →</a></p>
   </section>;
 }
