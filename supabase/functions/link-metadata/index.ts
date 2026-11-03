@@ -140,6 +140,28 @@ export default {
     }
 
     const sourceHost = sourceUrl.hostname.replace(/^www\./, '').toLowerCase();
+    if (sourceHost === 'youtube.com' || sourceHost === 'm.youtube.com' || sourceHost === 'music.youtube.com' || sourceHost === 'youtu.be') {
+      const videoId = sourceHost === 'youtu.be'
+        ? sourceUrl.pathname.split('/').filter(Boolean)[0]
+        : sourceUrl.pathname === '/watch'
+          ? sourceUrl.searchParams.get('v')
+          : (sourceUrl.pathname.split('/').filter(Boolean)[1] || '');
+      if (!videoId || !/^[A-Za-z0-9_-]{11}$/.test(videoId)) return json({ error: 'Invalid YouTube video link' }, 400);
+      try {
+        const canonicalUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
+        const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalUrl)}&format=json`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!response.ok) return json({ error: 'YouTube did not provide metadata for this video' }, 502);
+        const metadata = await response.json();
+        const title = String(metadata?.title || '').trim();
+        const channel = String(metadata?.author_name || '').trim();
+        if (!title) return json({ error: 'YouTube title was unavailable' }, 502);
+        return json({provider:'youtube',trackTitle:title,artistName:channel,imageUrl:metadata?.thumbnail_url||'',canonicalUrl});
+      } catch (error: any) {
+        return json({ error: error?.message || 'Could not fetch YouTube metadata' }, 502);
+      }
+    }
     if (!['open.spotify.com', 'spotify.link'].includes(sourceHost) && !sourceHost.endsWith('.spotify.com')) {
       return json({ error: 'Only Spotify links are supported' }, 400);
     }
