@@ -67,6 +67,8 @@ const guestRequestsKey = `dropmysong_requests_${eventSlug}`;
 const activeGuestStatuses = new Set(['pending','cant_find','accepted','playing']);
 const otherGuestRequests = document.querySelector('#otherGuestRequests');
 let guestRequestTimer = null;
+let alertRequestId = null;
+let guestRequestsBusy = false;
 const notifiedKaraokeVersions = new Map();
 function notifyKaraokeCall(row) {
   if (!row?.id || row.request_type !== 'karaoke' || row.status !== 'playing') return;
@@ -134,7 +136,9 @@ function saveGuestRequest(row) {
 }
 
 async function renderGuestRequests() {
-  if (!otherGuestRequests) return;
+  if (!otherGuestRequests || guestRequestsBusy) return;
+  guestRequestsBusy = true;
+  try {
   const saved = savedGuestRequests();
   if (!saved.length) { otherGuestRequests.replaceChildren(); return; }
   const token = guestToken;
@@ -143,7 +147,13 @@ async function renderGuestRequests() {
       const { data, error } = await supabase.rpc('get_request_status', {
         p_request_id: item.id, p_guest_token: token,
       });
-      return !error && data?.[0] ? { ...item, ...data[0] } : item;
+      if (error || !data?.[0]) return item;
+      const updated = { ...item, ...data[0] };
+      if (updated.request_type === 'karaoke' && updated.status === 'playing') {
+        const ack = await supabase.rpc('get_karaoke_arrival',{p_request_id:item.id,p_guest_token:token});
+        if (!ack.error) updated.singer_confirmed_at=ack.data;
+      }
+      return updated;
     } catch { return item; }
   }));
   // Keep the complete local history, but show only requests still awaiting or being performed.
@@ -180,6 +190,12 @@ async function renderGuestRequests() {
       item.status === 'cant_find' ? 'DJ needs help locating this version' :
       'Waiting for DJ approval';
     section.append(heading, title, badge, status);
+    if (item.request_type === 'karaoke' && item.status === 'playing' && item.singer_confirmed_at) {
+      const ack=document.createElement('span');
+      ack.className='status-pill accepted';
+      ack.textContent=getLanguage()==='fr'?'✓ En route':'✓ On My Way';
+      section.append(ack);
+    }
     if (canGuestCancel(item)) {
       const button=document.createElement('button');
       button.className='secondary-button';
@@ -191,15 +207,13 @@ async function renderGuestRequests() {
     }
     otherGuestRequests.append(section);
   }
+  } finally { guestRequestsBusy = false; }
 }
 
 function startGuestRequestPolling() {
   if (guestRequestTimer) clearInterval(guestRequestTimer);
-  if (eventSettingsTimer) clearInterval(eventSettingsTimer);
-  if (eventSettingsChannel) supabase.removeChannel(eventSettingsChannel);
-  document.removeEventListener('visibilitychange',refreshSettingsOnVisible);
   renderGuestRequests();
-  guestRequestTimer = setInterval(renderGuestRequests, 12000);
+  guestRequestTimer = setInterval(renderGuestRequests, 4000);
 }
 
 let pollTimer = null;
@@ -957,6 +971,10 @@ async function refreshStatus() {
 
   const row = data[0];
   currentRequest = { ...currentRequest, ...row };
+  if (currentRequest.request_type === 'karaoke' && currentRequest.status === 'playing') {
+    const ack=await supabase.rpc('get_karaoke_arrival',{p_request_id:currentRequest.id,p_guest_token:guestToken});
+    if (!ack.error) currentRequest.singer_confirmed_at=ack.data;
+  }
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
   saveGuestRequest(currentRequest);
   renderGuestRequests();
@@ -981,6 +999,8 @@ function renderCurrentStatus() {
   statusBadge.className = `status-pill ${currentRequest.status}`;
   statusText.textContent = t(`status.${type}.${currentRequest.status}`);
   statusPanel.classList.toggle('hidden', !activeGuestStatuses.has(currentRequest.status));
+  const onMyWay = currentRequest.request_type === 'karaoke' && currentRequest.status === 'playing' && currentRequest.singer_confirmed_at;
+  statusBadge.textContent = onMyWay ? (getLanguage()==='fr'?'✓ En route':'✓ On My Way') : statusBadge.textContent;
   cancelCurrentButton.classList.toggle('hidden', !canGuestCancel(currentRequest));
   cancelCurrentButton.textContent = getLanguage()==='fr'?'Annuler la demande':'Cancel request';
   renderPaymentStatus();
@@ -1013,7 +1033,7 @@ function restoreLastRequest() {
 
 function startPolling() {
   stopPolling();
-  pollTimer = setInterval(refreshStatus, 10000);
+  pollTimer = setInterval(refreshStatus, 4000);
 }
 
 function stopPolling() {
@@ -1139,7 +1159,27 @@ enableAlertsButton.addEventListener('click', async () => {
   await registerKaraokePush({ requestPermission: true, quiet: false });
 });
 
-readyAcknowledge.addEventListener('click', () => karaokeReadyAlert.classList.add('hidden'));
+readyAcknowledge.addEventListener('click', async () => {
+  if (!alertRequestId) return;
+  readyAcknowledge.disabled = true;
+  try {
+    const {data,error}=await supabase.rpc('confirm_karaoke_arrival',{
+      p_request_id:alertRequestId,p_guest_token:guestToken,
+    });
+    if (error || !data) throw new Error(error?.message || 'Could not confirm your response.');
+    const item=savedGuestRequests().find(row=>row.id===alertRequestId);
+    if (item) saveGuestRequest({...item,singer_confirmed_at:data});
+    if (currentRequest?.id===alertRequestId) {
+      currentRequest={...currentRequest,singer_confirmed_at:data};
+      renderCurrentStatus();
+    }
+    karaokeReadyAlert.classList.add('hidden');
+    showNotice(getLanguage()==='fr'?'✓ Confirmé — tu es en route!':'✓ Confirmed — On My Way!','success');
+    renderGuestRequests();
+  } catch(error) {
+    showNotice(error.message || 'Could not confirm arrival. Try again.','error');
+  } finally { readyAcknowledge.disabled=false; }
+});
 
 function primeAudio() {
   try {
@@ -1171,6 +1211,7 @@ function playReadySound() {
 }
 
 async function announceKaraokeReady(row) {
+  alertRequestId=row.id;
   karaokeReadySong.textContent = `${row.artist} — ${row.song}`;
   karaokeReadyAlert.classList.remove('hidden');
   playReadySound();
