@@ -72,10 +72,11 @@ export default function DjQueuePreview({eventId,language}){
         let id='';
         try{
           const url=new URL(source);
-          const host=url.hostname.replace(/^www\\./,'');
+          const host=url.hostname.replace('www.','');
           if(host==='youtu.be')id=url.pathname.split('/')[1]||'';
           else if(['youtube.com','m.youtube.com','music.youtube.com'].includes(host)){
-            id=url.pathname==='/watch'?url.searchParams.get('v')||'':url.pathname.match(/^\\/(embed|shorts|live)\\/([^/]+)/)?.[2]||'';
+            const parts=url.pathname.split('/').filter(Boolean);
+            id=url.pathname==='/watch'?(url.searchParams.get('v')||''):(['embed','shorts','live'].includes(parts[0])?parts[1]||'':'');
           }
         }catch{}
         if(!/^[a-zA-Z0-9_-]{11}$/.test(id))throw Error(fr?'Ajoutez une vidéo YouTube valide avant d’appeler.':'Add a valid YouTube video before calling this singer.');
