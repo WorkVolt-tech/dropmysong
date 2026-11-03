@@ -195,6 +195,14 @@ function mayReplaceAutoFilled(input, lastAutoValue) {
 
 function applyPreviewMetadata(preview) {
   if (!preview) return;
+  if (preview.needsManualMetadata) {
+    if (/^(Linked song|Artist not provided)$/i.test(artistInput.value.trim())) artistInput.value = '';
+    if (/^(Linked song|watch|Song from link)$/i.test(songInput.value.trim())) songInput.value = '';
+    showNotice(getLanguage()==='fr'
+      ? 'Impossible de récupérer le titre YouTube. Veuillez saisir l’artiste et le titre manuellement.'
+      : 'Could not retrieve the YouTube title. Please enter the artist and song manually.', 'error');
+    return;
+  }
 
   const detectedArtist = (preview.artistName || preview.subtitle || '').trim();
   const detectedSong = (preview.trackTitle || preview.title || '').trim();
@@ -742,6 +750,14 @@ form.addEventListener('submit', async event => {
         subtitle: artist,
       });
 
+      if (preview?.needsManualMetadata) {
+        showNotice(getLanguage()==='fr'
+          ? 'Impossible de récupérer le titre. Entrez l’artiste et le titre avant d’envoyer.'
+          : 'Could not retrieve the song title. Enter the artist and song before submitting.', 'error');
+        submitButton.disabled = false;
+        submitButton.textContent = t(submissionType === 'karaoke' ? 'guest.submit.karaoke' : 'guest.submit.song');
+        return;
+      }
       artist ||= (preview?.artistName || preview?.subtitle || 'Artist not provided').trim();
       song ||= (preview?.trackTitle || preview?.title || 'Song from link').trim();
 
@@ -757,6 +773,17 @@ form.addEventListener('submit', async event => {
       artist ||= 'Linked song';
       song ||= 'Song from link';
     }
+  }
+
+  // Reject metadata placeholders left behind by older versions of the form.
+  if (hasLink && (/^(Artist not provided|Linked song)$/i.test(artist)
+      || /^(watch|Linked song|Song from link)$/i.test(song))) {
+    showNotice(getLanguage()==='fr'
+      ? 'Veuillez saisir un véritable artiste et titre de chanson.'
+      : 'Please enter the actual artist and song title.', 'error');
+    submitButton.disabled = false;
+    submitButton.textContent = t(submissionType === 'karaoke' ? 'guest.submit.karaoke' : 'guest.submit.song');
+    return;
   }
 
   // Existing database rules require non-empty Artist/Song columns. By this
