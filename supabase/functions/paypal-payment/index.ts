@@ -131,7 +131,9 @@ async function confirmRequestFromOrder(admin: any, requestRow: any, order: any) 
       paypal_capture_id: capture.id,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', requestRow.id);
+    .eq('id', requestRow.id)
+    // Late or repeated capture webhooks must not resurrect a refunded payment.
+    .eq('paypal_refund_state', 'none');
 
   if (error) throw new Error(error.message);
 
