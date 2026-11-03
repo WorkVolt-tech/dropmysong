@@ -34,22 +34,44 @@ export default function GuestRequestForm({ event, slug, language }) {
 
   useEffect(() => {
     let active = true;
-    Promise.all([
-      supabase.from('dropmysong_event_options').select('karaoke_enabled,tips_enabled,tip_options,paypal_enabled,etransfer_enabled').eq('id',event.id).limit(1),
-      supabase.rpc('get_event_tip_visibility',{p_event_id:event.id}),
-    ]).then(([opt,vis]) => {
-      if (!active) return;
-      const o=opt.data?.[0] || {};
-      setOptions({
-        karaoke_enabled: o.karaoke_enabled ?? true,
-        tips_enabled: o.tips_enabled ?? event.tips_enabled,
-        tips_visible: vis.data?.[0]?.tips_visible !== false,
-        tip_options: Array.isArray(o.tip_options) ? o.tip_options : [5,10,15,20],
-        paypal_enabled: true,
-        etransfer_enabled: true,
-      });
-    }).catch(() => { if (active) setOptions(null); });
-    return () => { active=false; };
+    let checking = false;
+    const refresh = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const [opt,vis] = await Promise.all([
+          supabase.from('dropmysong_event_options')
+            .select('karaoke_enabled,tips_enabled,tip_options,paypal_enabled,etransfer_enabled')
+            .eq('id',event.id).limit(1),
+          supabase.rpc('get_event_tip_visibility',{p_event_id:event.id}),
+        ]);
+        if (!active || opt.error || vis.error) return;
+        const o = opt.data?.[0] || {};
+        const next = {
+          karaoke_enabled:o.karaoke_enabled ?? true,
+          tips_enabled:o.tips_enabled ?? event.tips_enabled,
+          tips_visible:vis.data?.[0]?.tips_visible !== false,
+          tip_options:Array.isArray(o.tip_options) ? o.tip_options : [5,10,15,20],
+          paypal_enabled:true,
+          etransfer_enabled:true,
+        };
+        setOptions(previous => previous && JSON.stringify(previous)===JSON.stringify(next) ? previous : next);
+      } catch (error) {
+        console.debug('Guest payment settings refresh failed:',error?.message||error);
+      } finally { checking = false; }
+    };
+    const channel = supabase.channel('dropmysong-event-settings-'+event.id)
+      .on('broadcast',{event:'settings-updated'},refresh).subscribe();
+    const timer = setInterval(refresh,6000);
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange',onVisible);
+    refresh();
+    return () => {
+      active=false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange',onVisible);
+      supabase.removeChannel(channel);
+    };
   },[event.id,event.tips_enabled]);
 
   useEffect(() => {
