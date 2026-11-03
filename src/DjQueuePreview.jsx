@@ -12,7 +12,7 @@ export default function DjQueuePreview({eventId,language}){
   const [notice,setNotice]=useState('');
   const refresh=useCallback(async()=>{
     const {data,error}=await supabase.from('song_requests')
-      .select('id,request_type,artist,song,requester_name,status,payment_status,tip_amount,sort_order,created_at')
+      .select('id,request_type,artist,song,requester_name,status,payment_status,payment_method,payment_sender_name,tip_amount,sort_order,created_at')
       .eq('event_id',eventId)
       .order('sort_order',{ascending:true})
       .order('created_at',{ascending:true});
@@ -46,6 +46,18 @@ export default function DjQueuePreview({eventId,language}){
     else if(!data?.length)setNotice(fr?'Demande modifiée. Actualisation…':'Request changed. Refreshing…');
     await refresh();setUpdating('');
   }
+  async function confirmTransfer(row) {
+    if(updating || row.payment_method!=='etransfer' || row.payment_status!=='pending')return;
+    if(!window.confirm(fr?'Confirmer que le virement Interac a été reçu ?':'Confirm you received this Interac e-Transfer?'))return;
+    setUpdating(row.id);setNotice('');
+    const {data,error}=await supabase.from('song_requests').update({
+      payment_status:'confirmed',payment_confirmed_at:new Date().toISOString()
+    }).eq('id',row.id).eq('event_id',eventId).eq('payment_method','etransfer')
+      .eq('payment_status','pending').select('id');
+    if(error)setNotice(error.message);
+    else setNotice(data?.length?(fr?'Virement confirmé.':'Transfer confirmed.'):(fr?'Le paiement a déjà changé.':'Payment status already changed.'));
+    await refresh();setUpdating('');
+  }
   const sections=[{type:'song',title:fr?'Demandes de chansons':'Song requests'},{type:'karaoke',title:fr?'File karaoké':'Karaoke queue'}];
   return <div className="dj-queue-preview" aria-label={fr?'File de demandes':'Request queue'}>
     {busy&&<p role="status">{fr?'Chargement des demandes…':'Loading requests…'}</p>}
@@ -59,6 +71,10 @@ export default function DjQueuePreview({eventId,language}){
           <div><strong>{row.artist} — {row.song}</strong>
           <p>{row.requester_name|| (fr?'Invité':'Guest')}</p></div>
           <div className="dj-queue-meta"><span>{row.status}</span>{Number(row.tip_amount)>0&&<small>{Number(row.tip_amount).toLocaleString(fr?'fr-CA':'en-CA',{style:'currency',currency:'CAD'})} · {row.payment_status||'pending'}</small>}</div>
+          {row.payment_method==='etransfer'&&row.payment_status==='pending'&&<div className="dj-transfer-confirm">
+            <span>{fr?'Expéditeur':'Sender'}: {row.payment_sender_name||'—'}</span>
+            <button type="button" disabled={!!updating} onClick={()=>confirmTransfer(row)}>{fr?'Confirmer le virement reçu':'Confirm transfer received'}</button>
+          </div>}
           {section.type==='song'&&<div className="dj-song-controls">
             {(row.status==='pending'||row.status==='cant_find')&&<>
               <button disabled={!!updating||row.payment_status==='pending'} onClick={()=>updateSong(row,'accepted')}>{fr?'Accepter':'Accept'}</button>
@@ -78,6 +94,6 @@ export default function DjQueuePreview({eventId,language}){
       </section>;
     })}
     {notice&&<p role="status" className="dj-queue-hint">{notice}</p>}
-    <p className="dj-queue-hint">{fr?'Les chansons sont contrôlables ici. Utilisez le tableau de bord pour le karaoké et les paiements.':'Song controls are available here. Use the original dashboard for karaoke and payment confirmations.'}</p>
+    <p className="dj-queue-hint">{fr?'Les chansons sont contrôlables ici. Utilisez le tableau de bord pour le karaoké et les paiements PayPal.':'Song controls are available here. Use the original dashboard for karaoke; PayPal confirmation remains automatic.'}</p>
   </div>;
 }
