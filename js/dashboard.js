@@ -18,6 +18,8 @@ const karaokeList = document.querySelector('#karaokeList');
 const karaokeSearch = document.querySelector('#karaokeSearch');
 const karaokeStatusFilter = document.querySelector('#karaokeStatusFilter');
 const requestCount = document.querySelector('#requestCount');
+const songRequestNotification = document.querySelector('#songRequestNotification');
+const karaokeRequestNotification = document.querySelector('#karaokeRequestNotification');
 const activeEventName = document.querySelector('#activeEventName');
 const requestsToggle = document.querySelector('#requestsToggle');
 const karaokeToggle = document.querySelector('#karaokeToggle');
@@ -258,8 +260,22 @@ async function loadRequests() {
   renderAll();
 }
 
+// Realtime is the primary update path. Polling catches dropped connections so
+// the notification counts still update without a manual refresh.
+let requestBadgeRefreshTimer = null;
+function ensureRequestBadgeRefresh() {
+  if (requestBadgeRefreshTimer) clearInterval(requestBadgeRefreshTimer);
+  requestBadgeRefreshTimer = setInterval(() => {
+    if (activeEvent && !document.hidden && !queueReorderInProgress) loadRequests();
+  }, 10000);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && activeEvent && !queueReorderInProgress) loadRequests();
+});
+
 function subscribeToRequests() {
   teardownRealtime();
+  ensureRequestBadgeRefresh();
   if (!activeEvent) return;
   realtimeChannel = supabase
     .channel(`dropmysong-dashboard-${activeEvent.id}`)
@@ -324,6 +340,8 @@ function subscribeKaraokeRemoteControl() {
 }
 
 function teardownRealtime() {
+  if (requestBadgeRefreshTimer) clearInterval(requestBadgeRefreshTimer);
+  requestBadgeRefreshTimer = null;
   if (realtimeChannel) supabase.removeChannel(realtimeChannel);
   if (karaokeRemoteChannel) supabase.removeChannel(karaokeRemoteChannel);
   realtimeChannel = null;
@@ -347,7 +365,23 @@ function activeCount(rows) {
   return rows.filter(row => ['pending', 'accepted', 'playing', 'cant_find'].includes(row.status)).length;
 }
 
+function updateRequestNotifications() {
+  const pending = status => status === 'pending' || status === 'cant_find';
+  const songNew = songRequests().filter(row => pending(row.status)).length;
+  const karaokeNew = karaokeRequests().filter(row => pending(row.status)).length;
+  for (const [element, count, kind] of [
+    [songRequestNotification, songNew, 'song'],
+    [karaokeRequestNotification, karaokeNew, 'karaoke'],
+  ]) {
+    if (!element) continue;
+    element.textContent = count > 99 ? '99+' : String(count);
+    element.classList.toggle('hidden', count === 0);
+    element.setAttribute('aria-label', count + ' new ' + kind + ' requests');
+  }
+}
+
 function renderAll() {
+  updateRequestNotifications();
   renderSongRequests();
   renderKaraokeRequests();
   renderSongSideRail();
@@ -2100,6 +2134,7 @@ document.querySelectorAll('.nav-item').forEach(button => {
 });
 
 function updateDashboardHeader() {
+  updateRequestNotifications();
   const titles = {
     queue: t('dashboard.songRequests'),
     karaoke: t('dashboard.karaokeRequests'),
