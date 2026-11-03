@@ -342,7 +342,10 @@ export default {
       if (eventError) return json({ error: eventError.message }, 500);
       if (!eventRow) return json({ error: 'Event not found' }, 404);
 
-      const appBase = Deno.env.get('DMS_PUBLIC_APP_URL') || 'https://workvolt-tech.github.io/dropmysong/';
+      // Cloudflare Pages is the canonical guest origin. The guest token is
+      // stored per origin, so redirecting to legacy GitHub Pages breaks the
+      // return/capture page even when PayPal completed the payment.
+      const appBase = 'https://dropmysong.pages.dev/';
       const returnUrl = new URL(body.return_page === 'app' ? 'app.html' : 'index.html', appBase);
       returnUrl.searchParams.set('event', eventRow.slug);
       returnUrl.searchParams.set('paypal', 'return');
