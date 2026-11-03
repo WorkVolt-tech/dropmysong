@@ -149,6 +149,13 @@ async function renderGuestRequests() {
       });
       if (error || !data?.[0]) return item;
       const updated = { ...item, ...data[0] };
+      if (updated.payment_method === 'paypal' && updated.status === 'rejected') {
+        const refund=await supabase.rpc('get_guest_refund_status',{p_request_id:item.id,p_guest_token:token});
+        if (!refund.error && refund.data?.length) {
+          updated.payment_status=refund.data[0].payment_status;
+          updated.paypal_refund_state=refund.data[0].refund_state;
+        }
+      }
       if (updated.request_type === 'karaoke' && updated.status === 'playing') {
         const ack = await supabase.rpc('get_karaoke_arrival',{p_request_id:item.id,p_guest_token:token});
         if (!ack.error) updated.singer_confirmed_at=ack.data;
@@ -163,7 +170,10 @@ async function renderGuestRequests() {
   for (const item of fetched) {
     if (item.id !== currentRequest?.id) notifyKaraokeCall(item);
   }
-  const other = fetched.filter(item => item.id !== currentRequest?.id && activeGuestStatuses.has(item.status || 'pending'));
+  const other = fetched.filter(item => item.id !== currentRequest?.id && (
+    activeGuestStatuses.has(item.status || 'pending') ||
+    (item.status === 'rejected' && item.payment_method === 'paypal')
+  ));
   otherGuestRequests.replaceChildren();
   for (const item of other) {
     const section = document.createElement('section');
@@ -190,6 +200,16 @@ async function renderGuestRequests() {
       item.status === 'cant_find' ? 'DJ needs help locating this version' :
       'Waiting for DJ approval';
     section.append(heading, title, badge, status);
+    if (item.status === 'rejected' && item.payment_method === 'paypal') {
+      const info=document.createElement('p');
+      info.className='status-pill ' + (item.payment_status==='refunded'?'accepted':'pending');
+      info.textContent=item.payment_status==='refunded'
+        ? (getLanguage()==='fr'?'✓ Remboursé par PayPal':'✓ PayPal refunded')
+        : item.payment_status==='refund_pending'
+          ? (getLanguage()==='fr'?'Remboursement en cours':'Refund processing')
+          : (getLanguage()==='fr'?'Demande refusée':'Request rejected');
+      section.append(info);
+    }
     if (item.request_type === 'karaoke' && item.status === 'playing' && item.singer_confirmed_at) {
       const ack=document.createElement('span');
       ack.className='status-pill accepted';
@@ -535,6 +555,18 @@ function renderPaymentStatus() {
 
   paymentStatusPanel.classList.remove('hidden');
   const amount = Number(currentRequest.tip_amount).toFixed(2);
+  if (currentRequest.payment_method === 'paypal' &&
+      ['refunded','refund_pending'].includes(currentRequest.payment_status)) {
+    const complete=currentRequest.payment_status==='refunded';
+    paymentStatusTitle.textContent=complete
+      ? (getLanguage()==='fr'? `Remboursement PayPal de ${amount} $ confirmé` : `PayPal refund confirmed — ${amount}`)
+      : (getLanguage()==='fr'? 'Remboursement en cours' : 'Refund processing');
+    paymentStatusText.textContent=complete
+      ? (getLanguage()==='fr'? 'La demande a été refusée et le remboursement a été envoyé par PayPal.' : 'Your request was rejected and PayPal confirmed the refund.')
+      : (getLanguage()==='fr'? 'PayPal traite votre remboursement.' : 'PayPal is processing your refund.');
+    paypalPayButton.classList.add('hidden');
+    return;
+  }
   const confirmed = currentRequest.payment_status === 'confirmed';
   paymentStatusTitle.textContent = confirmed
     ? t('guest.paymentConfirmedTitle', { amount })
@@ -971,6 +1003,15 @@ async function refreshStatus() {
 
   const row = data[0];
   currentRequest = { ...currentRequest, ...row };
+  if (currentRequest.payment_method === 'paypal') {
+    const refund = await supabase.rpc('get_guest_refund_status',{
+      p_request_id:currentRequest.id,p_guest_token:guestToken,
+    });
+    if (!refund.error && refund.data?.length) {
+      currentRequest.payment_status=refund.data[0].payment_status;
+      currentRequest.paypal_refund_state=refund.data[0].refund_state;
+    }
+  }
   if (currentRequest.request_type === 'karaoke' && currentRequest.status === 'playing') {
     const ack=await supabase.rpc('get_karaoke_arrival',{p_request_id:currentRequest.id,p_guest_token:guestToken});
     if (!ack.error) currentRequest.singer_confirmed_at=ack.data;
@@ -998,7 +1039,8 @@ function renderCurrentStatus() {
   statusBadge.textContent = type === 'karaoke' ? t(`status.karaoke.${currentRequest.status}Label`) : t(`status.${currentRequest.status}`);
   statusBadge.className = `status-pill ${currentRequest.status}`;
   statusText.textContent = t(`status.${type}.${currentRequest.status}`);
-  statusPanel.classList.toggle('hidden', !activeGuestStatuses.has(currentRequest.status));
+  statusPanel.classList.toggle('hidden', !activeGuestStatuses.has(currentRequest.status)
+    && !(currentRequest.status==='rejected' && currentRequest.payment_method==='paypal'));
   const onMyWay = currentRequest.request_type === 'karaoke' && currentRequest.status === 'playing' && currentRequest.singer_confirmed_at;
   statusBadge.textContent = onMyWay ? (getLanguage()==='fr'?'✓ En route':'✓ On My Way') : statusBadge.textContent;
   cancelCurrentButton.classList.toggle('hidden', !canGuestCancel(currentRequest));
