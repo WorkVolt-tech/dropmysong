@@ -149,7 +149,24 @@ export default {
       if (!videoId || !/^[A-Za-z0-9_-]{11}$/.test(videoId)) return json({ error: 'Invalid YouTube video link' }, 400);
       try {
         const canonicalUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`;
-        const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalUrl)}&format=json`, {
+        // The YouTube Data API is more reliable from Supabase than browser oEmbed.
+        const apiKey = Deno.env.get('DMS_YOUTUBE_API_KEY') || '';
+        if (apiKey) {
+          const apiUrl = new URL('https://www.googleapis.com/youtube/v3/videos');
+          apiUrl.searchParams.set('part','snippet');
+          apiUrl.searchParams.set('id',videoId);
+          apiUrl.searchParams.set('key',apiKey);
+          const result = await fetch(apiUrl);
+          if (result.ok) {
+            const video = (await result.json())?.items?.[0]?.snippet;
+            if (video?.title) return json({
+              provider:'youtube',trackTitle:video.title,
+              artistName:video.channelTitle||'',imageUrl:video.thumbnails?.medium?.url||'',
+              canonicalUrl,
+            });
+          } else console.warn('YouTube Data API metadata lookup failed',result.status);
+        }
+        const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalUrl)}&format=json`,{
           headers: { Accept: 'application/json' },
         });
         if (!response.ok) return json({ error: 'YouTube did not provide metadata for this video' }, 502);
