@@ -195,6 +195,9 @@ async function renderGuestRequests() {
 
 function startGuestRequestPolling() {
   if (guestRequestTimer) clearInterval(guestRequestTimer);
+  if (eventSettingsTimer) clearInterval(eventSettingsTimer);
+  if (eventSettingsChannel) supabase.removeChannel(eventSettingsChannel);
+  document.removeEventListener('visibilitychange',refreshSettingsOnVisible);
   renderGuestRequests();
   guestRequestTimer = setInterval(renderGuestRequests, 12000);
 }
@@ -588,6 +591,66 @@ function syncAvailability() {
   syncPaymentUi();
 }
 
+let eventSettingsChannel = null;
+let eventSettingsTimer = null;
+let eventSettingsBusy = false;
+
+async function refreshEventSettings() {
+  if (!publicEvent?.id || eventSettingsBusy) return;
+  eventSettingsBusy = true;
+  const eventId = publicEvent.id;
+  try {
+    const [base, options, visibility] = await Promise.all([
+      supabase.rpc('get_public_event', { p_slug:eventSlug }),
+      supabase.from('dropmysong_event_options')
+        .select('requests_enabled,karaoke_enabled,tips_enabled,tip_options,paypal_enabled,etransfer_enabled')
+        .eq('id',eventId).limit(1),
+      supabase.rpc('get_event_tip_visibility', { p_event_id:eventId }),
+    ]);
+    if (publicEvent?.id !== eventId || base.error || !base.data?.length) return;
+    const old = publicEvent;
+    const baseRow = base.data[0];
+    const optionRow = !options.error ? options.data?.[0] : null;
+    const visible = !visibility.error && visibility.data?.length
+      ? visibility.data[0].tips_visible !== false : old.tips_visible;
+    const next = {
+      ...old,
+      ...baseRow,
+      ...(optionRow || {}),
+      tips_visible:visible,
+      paypal_enabled:true,
+      etransfer_enabled:true,
+      paypal_me_url:PAYPAL_ME_URL,
+      etransfer_email:ETRANSFER_EMAIL,
+    };
+    const keys = ['requests_enabled','karaoke_enabled','tips_enabled','tips_visible','tip_options','paypal_enabled','etransfer_enabled'];
+    const changed = keys.some(key => JSON.stringify(old[key]) !== JSON.stringify(next[key]));
+    if (changed) {
+      publicEvent = next;
+      renderEventBanner();
+      // Only rebuild options when they change. Do not wipe a guest's other form inputs.
+      syncAvailability();
+    }
+  } catch (error) {
+    console.debug('Guest event setting refresh failed:',error?.message || error);
+  } finally { eventSettingsBusy = false; }
+}
+
+function watchEventSettings() {
+  if (!publicEvent?.id) return;
+  if (eventSettingsChannel) supabase.removeChannel(eventSettingsChannel);
+  if (eventSettingsTimer) clearInterval(eventSettingsTimer);
+  eventSettingsChannel = supabase.channel('dropmysong-event-settings-' + publicEvent.id)
+    .on('broadcast',{event:'settings-updated'},refreshEventSettings)
+    .subscribe();
+  eventSettingsTimer = setInterval(refreshEventSettings,6000);
+  document.addEventListener('visibilitychange',refreshSettingsOnVisible);
+}
+
+function refreshSettingsOnVisible() {
+  if (!document.hidden) refreshEventSettings();
+}
+
 async function loadEvent() {
   if (!eventSlug) {
     showNotice(t('notice.missingEvent'), 'error');
@@ -637,6 +700,7 @@ async function loadEvent() {
 
   renderEventBanner();
   syncAvailability();
+  watchEventSettings();
   await loadRecentPlayed();
   startRecentPlayedPolling();
   restoreLastRequest();
