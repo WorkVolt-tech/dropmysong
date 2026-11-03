@@ -813,6 +813,13 @@ function requestCard(row, index, type, canReorder = false) {
   const tipBadge = row.tip_amount
     ? `<span class="request-meta-chip tip">♥ ${Number(row.tip_amount).toFixed(2)}</span>`
     : '';
+  const refundBadge = row.paypal_refund_state === 'completed'
+    ? '<span class="request-meta-chip payment confirmed">↩ PayPal refunded</span>'
+    : row.paypal_refund_state === 'pending'
+      ? '<span class="request-meta-chip payment pending">↩ Refund processing</span>'
+      : row.paypal_refund_state === 'needs_review'
+        ? '<span class="request-meta-chip payment pending">⚠ Refund needs review</span>'
+        : '';
   const paymentBadge = paymentPending
     ? `<span class="request-meta-chip payment pending">⏳ ${escapeHtml(t('dashboard.paymentPending'))}${methodLabel ? ` · ${escapeHtml(methodLabel)}` : ''}</span>`
     : paymentConfirmed
@@ -911,7 +918,7 @@ function requestCard(row, index, type, canReorder = false) {
               </div>
               <p class="request-artist">${escapeHtml(row.artist)}</p>
               <h3>${escapeHtml(row.song)}</h3>
-              <div class="request-meta">${personBadge}${tipBadge}${paymentBadge}${duplicateBadge}</div>
+              <div class="request-meta">${personBadge}${tipBadge}${paymentBadge}${refundBadge}${duplicateBadge}</div>
             </div>
           </div>
           ${row.message ? `<p class="request-note">“${escapeHtml(row.message)}”</p>` : ''}
@@ -1185,6 +1192,39 @@ async function sendKaraokePush(row) {
 async function updateStatus(id, status) {
   const row = requests.find(item => item.id === id);
   if (!row) return;
+
+  // Paid PayPal requests can only be rejected after PayPal accepts the refund.
+  if (status === 'rejected' && row.payment_method === 'paypal') {
+    const {data:sessionData}=await supabase.auth.getSession();
+    if (!sessionData?.session) {
+      showDashboardNotice('Sign in as the event owner to refund a PayPal payment.','error');
+      return;
+    }
+    const button=document.querySelector(`[data-action="rejected"][data-id="${id}"]`);
+    if(button)button.disabled=true;
+    showDashboardNotice('Processing PayPal refund before rejecting the request…');
+    try {
+      const {data,error}=await supabase.functions.invoke('reject-paypal-request',{
+        body:{request_id:id},
+      });
+      if(error||!data?.ok) {
+        const reason=data?.error||error?.context?.message||error?.message||'Refund could not be verified';
+        throw new Error(reason);
+      }
+      if(data.refunded) showDashboardNotice('Request rejected. PayPal refund completed.','success');
+      else if(data.refund_pending) showDashboardNotice('Request rejected. PayPal is processing the refund.','success');
+      else showDashboardNotice('Unpaid request rejected; no refund was necessary.','success');
+      await loadRequests();
+    } catch(error) {
+      showDashboardNotice(error?.message || 'Refund failed. Request was not rejected.','error');
+      await loadRequests();
+    } finally {if(button)button.disabled=false;}
+    return;
+  }
+  // Interac e-Transfers must be refunded manually; never imply PayPal handled them.
+  if (status === 'rejected' && row.payment_method === 'etransfer' && row.payment_status === 'confirmed') {
+    if (!window.confirm('This Interac payment cannot be refunded automatically. Have you arranged the refund manually?')) return;
+  }
 
   if (row.payment_status === 'pending' && ['accepted', 'playing', 'played'].includes(status)) {
     showDashboardNotice(t('dashboard.confirmPaymentFirst'), 'error');
