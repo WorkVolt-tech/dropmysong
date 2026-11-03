@@ -1425,7 +1425,21 @@ async function updateEventSetting(field, value, label) {
     requireTipSetting.checked = value;
   }
   if (field === 'tips_visible') syncTipVisibilityControls();
+  broadcastEventSettings(activeEvent.id);
   showDashboardNotice(t(value ? 'dashboard.settingEnabled' : 'dashboard.settingDisabled', { name: label }), 'success');
+}
+
+function broadcastEventSettings(eventId) {
+  if (!eventId) return;
+  // The database is the source of truth. The broadcast makes already-open
+  // guest forms refresh immediately; periodic checks cover missed messages.
+  const channel = supabase.channel('dropmysong-event-settings-' + eventId);
+  channel.subscribe(status => {
+    if (status !== 'SUBSCRIBED') return;
+    channel.send({ type:'broadcast', event:'settings-updated', payload:{ event_id:eventId } })
+      .catch(error => console.warn('Event settings broadcast unavailable:', error))
+      .finally(() => supabase.removeChannel(channel));
+  });
 }
 
 function normalizeTipOptions(value) {
@@ -1477,6 +1491,7 @@ paymentSettingsForm.addEventListener('submit', async event => {
   events = events.map(item => item.id === activeEvent.id ? { ...item, ...payload } : item);
   tipsRequiredToggle.checked = tipsRequired;
   syncPaymentSettingsForm();
+  broadcastEventSettings(activeEvent.id);
   showDashboardNotice(t('dashboard.paymentSettingsSaved'), 'success');
 });
 
