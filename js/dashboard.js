@@ -904,6 +904,9 @@ function requestCard(row, index, type, canReorder = false) {
                 <span class="request-number">#${index + 1}</span>
                 <span class="request-type-pill ${type}">${escapeHtml(type === 'karaoke' ? t('dashboard.karaoke') : t('host.song'))}</span>
                 <span class="status-pill ${row.status}">${escapeHtml(statusLabel)}</span>
+                ${type === 'karaoke' && row.status === 'playing' && row.singer_confirmed_at
+                  ? `<span class="status-pill accepted">✓ ${escapeHtml(getLanguage() === 'fr' ? 'En route' : 'On My Way')}</span>`
+                  : ''}
                 <span class="request-time">${escapeHtml(relativeTime(row.created_at, getLanguage()))}</span>
               </div>
               <p class="request-artist">${escapeHtml(row.artist)}</p>
@@ -1204,6 +1207,8 @@ async function updateStatus(id, status) {
   }
 
   const payload = { status, updated_at: new Date().toISOString() };
+  if ((row.request_type || 'song') === 'karaoke' && status !== 'playing') payload.singer_confirmed_at = null;
+  if ((row.request_type || 'song') === 'karaoke' && status === 'playing' && row.status !== 'playing') payload.singer_confirmed_at = null;
   if (status === 'played') payload.played_at = new Date().toISOString();
   if (status !== 'played' && row.status === 'played') payload.played_at = null;
 
@@ -1256,21 +1261,20 @@ async function broadcastGuestStatus(row, status) {
   if (!row?.guest_token) return;
   const channel = supabase.channel(`dropmysong-request-${row.id}-${row.guest_token}`);
   try {
-    await channel.send({
-      type: 'broadcast',
-      event: 'status-update',
-      payload: {
-        request_id: row.id,
-        request_type: row.request_type || 'song',
-        status,
-        updated_at: new Date().toISOString(),
-      },
+    await new Promise((resolve,reject) => {
+      const timer=setTimeout(()=>reject(new Error('Realtime subscription timeout')),2200);
+      channel.subscribe(state => {
+        if (state === 'SUBSCRIBED') { clearTimeout(timer);resolve(); }
+        if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') {clearTimeout(timer);reject(new Error(state));}
+      });
     });
-  } catch (error) {
-    console.warn('DropMySong guest broadcast failed; polling will still update the guest.', error);
-  } finally {
-    supabase.removeChannel(channel);
-  }
+    await channel.send({
+      type:'broadcast',event:'status-update',
+      payload:{request_id:row.id,request_type:row.request_type||'song',status,updated_at:new Date().toISOString()},
+    });
+  } catch(error) {
+    console.warn('DropMySong guest broadcast failed; polling remains enabled.',error);
+  } finally {supabase.removeChannel(channel);}
 }
 
 function renderSongSideRail() {
