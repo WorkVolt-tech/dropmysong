@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import DjQueuePreview from './DjQueuePreview.jsx';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../js/config.js';
 
 const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
@@ -10,6 +11,7 @@ export default function DjEventOverview({language}) {
   const [events,setEvents]=useState([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
+  const [selectedEvent,setSelectedEvent]=useState('');
   useEffect(()=>{
     let active=true;
     const load=async ()=>{
@@ -20,6 +22,7 @@ export default function DjEventOverview({language}) {
       const result=await db.from('events').select('id,name,slug,event_date,is_active,requests_enabled,karaoke_enabled,tips_visible').order('created_at',{ascending:false});
       if(!active)return;
       setEvents(result.data||[]);
+      setSelectedEvent(prev=>(result.data||[]).some(e=>e.id===prev)?prev:(result.data||[]).find(e=>e.is_active)?.id || result.data?.[0]?.id || '');
       setError(result.error?.message||'');
       setLoading(false);
     };
@@ -33,6 +36,8 @@ export default function DjEventOverview({language}) {
     <h2>{fr?'Vos événements':'Your events'}</h2>
     {error&&<p role="alert">{error}</p>}
     {!error&&!events.length&&<p>{fr?'Aucun événement.':'No events yet.'}</p>}
+    {!!events.length&&<label className="dj-event-picker">{fr?'Événement actif':'Selected event'}<select value={selectedEvent} onChange={e=>setSelectedEvent(e.target.value)}>{events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}</select></label>}
+    {!!selectedEvent&&<DjQueuePreview eventId={selectedEvent} language={language}/>}
     <div className="dj-event-grid">{events.map(e=><article key={e.id} className="dj-event">
       <div className="dj-event-head"><strong>{e.name}</strong><small>{e.is_active?(fr?'Actif':'Active'):(fr?'Archivé':'Archived')}</small></div>
       {e.event_date&&<p>{e.event_date}</p>}
