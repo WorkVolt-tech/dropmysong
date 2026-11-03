@@ -75,6 +75,43 @@ function savedGuestRequests() {
   } catch { return []; }
 }
 
+function canGuestCancel(row) {
+  return row && ['pending','cant_find','accepted'].includes(row.status || 'pending')
+    && Number(row.tip_amount || 0) === 0;
+}
+
+async function cancelGuestRequest(row) {
+  if (!canGuestCancel(row)) return;
+  const fr = getLanguage() === 'fr';
+  if (!window.confirm(fr ? 'Annuler cette demande ?' : 'Cancel this request?')) return;
+  const { data, error } = await supabase.rpc('cancel_guest_request', {
+    p_request_id: row.id, p_guest_token: guestToken,
+  });
+  if (error || !data) {
+    showNotice(error?.message || (fr ? 'Annulation impossible. Vérifiez si la demande a déjà commencé ou si un paiement est associé.' : 'Cannot cancel. The request may have started or have a payment attached.'), 'error');
+    await renderGuestRequests();
+    if (currentRequest?.id === row.id) await refreshStatus();
+    return;
+  }
+  const cancelled = { ...row, status:'rejected', updated_at:new Date().toISOString() };
+  saveGuestRequest(cancelled);
+  if (currentRequest?.id === row.id) {
+    currentRequest = { ...currentRequest, ...cancelled };
+    localStorage.setItem(`dropmysong_last_${eventSlug}`,JSON.stringify(currentRequest));
+    renderCurrentStatus();
+    stopPolling();
+  }
+  showNotice(fr ? 'Votre demande a été annulée.' : 'Your request was cancelled.', 'success');
+  await renderGuestRequests();
+}
+
+const cancelCurrentButton = document.createElement('button');
+cancelCurrentButton.type = 'button';
+cancelCurrentButton.className = 'secondary-button';
+cancelCurrentButton.style.cssText = 'width:100%;margin-top:12px';
+cancelCurrentButton.addEventListener('click', () => cancelGuestRequest(currentRequest));
+statusPanel.append(cancelCurrentButton);
+
 function saveGuestRequest(row) {
   const rows = savedGuestRequests().filter(item => item.id !== row.id);
   rows.push(row);
@@ -117,6 +154,15 @@ async function renderGuestRequests() {
       item.status === 'cant_find' ? 'DJ needs help locating this version' :
       'Waiting for DJ approval';
     section.append(heading, title, badge, status);
+    if (canGuestCancel(item)) {
+      const button=document.createElement('button');
+      button.className='secondary-button';
+      button.type='button';
+      button.style.cssText='margin-top:10px;width:100%';
+      button.textContent=getLanguage()==='fr'?'Annuler la demande':'Cancel request';
+      button.addEventListener('click',()=>cancelGuestRequest(item));
+      section.append(button);
+    }
     otherGuestRequests.append(section);
   }
 }
@@ -818,6 +864,8 @@ function renderCurrentStatus() {
   statusBadge.className = `status-pill ${currentRequest.status}`;
   statusText.textContent = t(`status.${type}.${currentRequest.status}`);
   statusPanel.classList.toggle('hidden', !activeGuestStatuses.has(currentRequest.status));
+  cancelCurrentButton.classList.toggle('hidden', !canGuestCancel(currentRequest));
+  cancelCurrentButton.textContent = getLanguage()==='fr'?'Annuler la demande':'Cancel request';
   renderPaymentStatus();
   renderLinkPreviewInto(statusLinkPreview, currentRequest.song_url, {
     linked: true,
