@@ -13,14 +13,37 @@ export default function GuestEventPreview({ slug, language }) {
 
   useEffect(() => {
     let active = true;
+    let channel = null;
+    let eventId = null;
     setState('loading');
     setEvent(null);
-    supabase.rpc('get_public_event', { p_slug: slug }).then(({ data, error }) => {
-      if (!active) return;
-      if (error || !data?.length) setState('missing');
-      else { setEvent(data[0]); setState('ready'); }
-    }).catch(() => { if (active) setState('missing'); });
-    return () => { active = false; };
+    const refresh = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_public_event', { p_slug: slug });
+        if (!active) return;
+        if (error || !data?.length) { setState('missing'); return; }
+        const latest = data[0];
+        setEvent(previous => previous && JSON.stringify(previous) === JSON.stringify(latest) ? previous : latest);
+        setState('ready');
+        if (latest.id && latest.id !== eventId) {
+          eventId = latest.id;
+          if (channel) supabase.removeChannel(channel);
+          channel = supabase.channel('dropmysong-event-settings-' + eventId)
+            .on('broadcast', { event:'settings-updated' }, refresh)
+            .subscribe();
+        }
+      } catch { if (active) setState('missing'); }
+    };
+    const onVisible = () => { if (!document.hidden) refresh(); };
+    refresh();
+    const timer = setInterval(refresh, 6000);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      active = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [slug]);
 
   const fr = language === 'fr';
