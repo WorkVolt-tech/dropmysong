@@ -1208,7 +1208,9 @@ async function updateStatus(id, status) {
         body:{request_id:id},
       });
       if(error||!data?.ok) {
-        const reason=data?.error||error?.context?.message||error?.message||'Refund could not be verified';
+        let detail = null;
+        try { detail = await error?.context?.json?.(); } catch {}
+        const reason=data?.error||detail?.error||error?.message||'Refund could not be verified';
         throw new Error(reason);
       }
       if(data.refunded) showDashboardNotice('Request rejected. PayPal refund completed.','success');
@@ -1224,6 +1226,12 @@ async function updateStatus(id, status) {
   // Interac e-Transfers must be refunded manually; never imply PayPal handled them.
   if (status === 'rejected' && row.payment_method === 'etransfer' && row.payment_status === 'confirmed') {
     if (!window.confirm('This Interac payment cannot be refunded automatically. Have you arranged the refund manually?')) return;
+  }
+
+  if (row.payment_method === 'paypal' &&
+      ['processing', 'needs_review', 'pending'].includes(row.paypal_refund_state) && status !== 'rejected') {
+    showDashboardNotice('This request has a refund in progress or requires refund review. It cannot be played or accepted.', 'error');
+    return;
   }
 
   if (row.payment_status === 'pending' && ['accepted', 'playing', 'played'].includes(status)) {
