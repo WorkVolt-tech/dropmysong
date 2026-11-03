@@ -88,7 +88,7 @@ export default {
 
     // An unpaid PayPal request has no funds to refund.
     if(row.payment_status!=='confirmed'){
-      if(row.paypal_capture_id) return reply({error:'Payment state must be reviewed before rejection'},409);
+      if(row.paypal_capture_id || row.paypal_order_id) return reply({error:'PayPal checkout has started. Wait for payment confirmation before rejecting this request.'},409);
       const {data:cancelled,error:cancelError}=await admin.from('song_requests')
         .update({status:'rejected',updated_at:new Date().toISOString()})
         .eq('id',row.id).in('status',['pending','accepted','cant_find'])
