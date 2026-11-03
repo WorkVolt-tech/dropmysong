@@ -26,6 +26,7 @@ export default function GuestRequestForm({ event, slug, language }) {
   const [preview,setPreview] = useState(null);
   const [previewBusy,setPreviewBusy] = useState(false);
   const [readyMessage,setReadyMessage] = useState('');
+  const [onMyWay,setOnMyWay] = useState(false);
   const [notificationsEnabled,setNotificationsEnabled] = useState(() => typeof Notification !== 'undefined' && Notification.permission === 'granted');
   const announcedVersion = useRef(null);
   const guestUrl = new URL('/index.html',window.location.origin);
@@ -98,6 +99,10 @@ export default function GuestRequestForm({ event, slug, language }) {
         const row=data[0];
         setStatus(row.status || '');
         setPaymentStatus(row.payment_status || '');
+        if ((request.request_type||'song')==='karaoke' && row.status==='playing') {
+          const ack=await supabase.rpc('get_karaoke_arrival',{p_request_id:request.id,p_guest_token:token});
+          if (active && !ack.error) setOnMyWay(Boolean(ack.data));
+        } else if (active) setOnMyWay(false);
         if ((row.request_type || request.request_type)==='karaoke' && row.status==='playing' && announcedVersion.current!==row.updated_at) {
           announcedVersion.current=row.updated_at;
           setReadyMessage(messages[language==='fr'?'fr':'en'].ready);
@@ -109,7 +114,7 @@ export default function GuestRequestForm({ event, slug, language }) {
     };
     refresh();
     const channel=supabase.channel('react-guest-'+request.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'song_requests',filter:'id=eq.'+request.id},refresh).subscribe();
-    const timer=window.setInterval(refresh,12000);
+    const timer=window.setInterval(refresh,4000);
     return () => { active=false;window.clearInterval(timer);supabase.removeChannel(channel); };
   },[request?.id,language]);
 
@@ -218,6 +223,21 @@ export default function GuestRequestForm({ event, slug, language }) {
     window.location.assign(result.approve_url);
   }
 
+  async function confirmArrival() {
+    if (!request?.id || status!=='playing') return;
+    setBusy(true);
+    try {
+      const {data,error}=await supabase.rpc('confirm_karaoke_arrival',{
+        p_request_id:request.id,p_guest_token:getOrCreateGuestToken(),
+      });
+      if (error || !data) throw Error(error?.message || t.error);
+      setOnMyWay(true);
+      setReadyMessage('');
+      setNotice(language==='fr'?'✓ Confirmé — en route!':'✓ Confirmed — On My Way!');
+    } catch(error){setNotice(error.message||t.error);}
+    finally{setBusy(false);}
+  }
+
   async function cancelCurrentRequest() {
     if (!request?.id || busy || returnProcessing || Number(request.tip_amount||0)>0 || !['pending','cant_find','accepted'].includes(status||'pending')) return;
     if (!window.confirm(language==='fr'?'Annuler cette demande ?':'Cancel this request?')) return;
@@ -285,7 +305,7 @@ export default function GuestRequestForm({ event, slug, language }) {
       if(error) throw error;
       const saved={id,artist:payload.artist,song:payload.song,request_type:mode,tip_amount:payload.tip_amount,payment_method:payload.payment_method,payment_status:payload.payment_status,etransfer_email:ETRANSFER_EMAIL};
       localStorage.setItem('dropmysong_last_'+slug,JSON.stringify(saved));
-      announcedVersion.current=null;setReadyMessage('');setRequest(saved);setStatus('pending');setPaymentStatus(saved.payment_status);setFields(initial);setPreview(null);setNotice(t.success);
+      announcedVersion.current=null;setReadyMessage('');setOnMyWay(false);setRequest(saved);setStatus('pending');setPaymentStatus(saved.payment_status);setFields(initial);setPreview(null);setNotice(t.success);
       if(amount&&method==='paypal'){
         // The established PayPal backend returns to index.html for verified capture.
         await openPayPal(saved);
@@ -321,7 +341,8 @@ export default function GuestRequestForm({ event, slug, language }) {
     </form>}
     {returnProcessing&&<p role="status" className="form-feedback">{language==='fr'?'Vérification du paiement PayPal…':'Verifying PayPal payment…'}</p>}
     {notice&&<p role="status" className="form-feedback">{notice}</p>}
-    {readyMessage&&<div className="form-feedback karaoke-ready-alert" role="alert">🎤 {readyMessage}</div>}
+    {readyMessage&&!onMyWay&&<div className="form-feedback karaoke-ready-alert" role="alert">🎤 {readyMessage}<button type="button" className="module-link" disabled={busy} onClick={confirmArrival}>{language==='fr'?"J'arrive!":"I'm Coming!"}</button></div>}
+    {request?.request_type==='karaoke'&&status==='playing'&&onMyWay&&<p className="form-feedback" role="status">✓ {language==='fr'?'En route — confirmé':'On My Way — Confirmed'}</p>}
     {request?.request_type==='karaoke' && typeof Notification!=='undefined' && !notificationsEnabled && <button type="button" className="alert-enable" onClick={enableKaraokeAlerts}>{t.enableAlert}</button>}
     {request&&['pending','cant_find','accepted','playing'].includes(status||'pending')&&<div className="form-feedback" role="status"><strong>{t.status}: {status||t.pending}</strong><p>{request.artist} — {request.song}</p>{request.payment_method==='paypal'&&<><p>{paymentStatus==='confirmed'?t.paid:t.pendingPay}</p>{paymentStatus!=='confirmed'&&<button type="button" className="module-link" onClick={retryPayPal} disabled={busy}>{t.retry}</button>}</>}{Number(request.tip_amount||0)===0&&['pending','cant_find','accepted'].includes(status||'pending')&&<button className="alert-enable" type="button" onClick={cancelCurrentRequest} disabled={busy}>{language==='fr'?'Annuler la demande':'Cancel request'}</button>}<p><a href={guestHref}>{t.full} →</a></p></div>}
     <p className="full-guest-link"><a href={guestHref}>{t.full} →</a></p>
