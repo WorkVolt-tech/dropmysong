@@ -1198,10 +1198,11 @@ async function updateStatus(id, status) {
       return;
     }
 
-    showDashboardNotice(t('dashboard.youtubeRechecking'));
-    const validation = await validateYoutubeVideo(source, true);
-    if (!validation.valid) {
-      showDashboardNotice(validation.error || t('dashboard.youtubeUnavailableNow'), 'error');
+    // Calling the singer should not wait on a remote YouTube API request.
+    // Video validity remains available via Recheck Video and karaoke preflight.
+    const cachedValidation = youtubeCacheRead()[youtubeValidationCacheKey(youtubeVideoId(source))]?.validation;
+    if (cachedValidation?.valid === false) {
+      showDashboardNotice(cachedValidation.error || t('dashboard.youtubeUnavailableNow'), 'error');
       return;
     }
   }
