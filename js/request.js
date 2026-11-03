@@ -166,10 +166,16 @@ async function renderGuestRequests() {
     title.textContent = `${item.artist || ''} — ${item.song || ''}`;
     const badge = document.createElement('span');
     badge.className = `status-pill ${item.status || 'pending'}`;
-    badge.textContent = item.status || 'pending';
+    badge.textContent = item.request_type === 'karaoke' && item.status === 'playing'
+      ? (getLanguage() === 'fr' ? 'À TOI!' : 'YOU’RE UP!')
+      : item.request_type === 'karaoke' && item.status === 'accepted'
+        ? (getLanguage() === 'fr' ? 'Dans la file' : 'Queued')
+        : (item.status || 'pending');
     const status = document.createElement('p');
     status.className = 'muted';
-    status.textContent = item.status === 'playing' ? (item.request_type === 'karaoke' ? '🎤 YOU’RE UP! Come to the karaoke area now.' : 'Currently playing') :
+    status.textContent = item.status === 'playing' ? (item.request_type === 'karaoke'
+      ? (getLanguage() === 'fr' ? '🎤 C’EST À TOI! Viens chanter maintenant.' : '🎤 YOU’RE UP! Come to the karaoke area now.')
+      : 'Currently playing') :
       item.status === 'accepted' ? 'Approved — waiting in the queue' :
       item.status === 'cant_find' ? 'DJ needs help locating this version' :
       'Waiting for DJ approval';
