@@ -63,6 +63,70 @@ const recentPlayedList = document.querySelector('#recentPlayedList');
 let requestType = params.get('type') === 'karaoke' ? 'karaoke' : 'song';
 let publicEvent = null;
 let currentRequest = null;
+const guestRequestsKey = `dropmysong_requests_${eventSlug}`;
+const activeGuestStatuses = new Set(['pending','cant_find','accepted','playing']);
+const otherGuestRequests = document.querySelector('#otherGuestRequests');
+let guestRequestTimer = null;
+
+function savedGuestRequests() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(guestRequestsKey) || '[]');
+    return Array.isArray(saved) ? saved.filter(row => row?.id).slice(-40) : [];
+  } catch { return []; }
+}
+
+function saveGuestRequest(row) {
+  const rows = savedGuestRequests().filter(item => item.id !== row.id);
+  rows.push(row);
+  localStorage.setItem(guestRequestsKey, JSON.stringify(rows.slice(-40)));
+}
+
+async function renderGuestRequests() {
+  if (!otherGuestRequests) return;
+  const saved = savedGuestRequests();
+  if (!saved.length) { otherGuestRequests.replaceChildren(); return; }
+  const token = guestToken;
+  const fetched = await Promise.all(saved.map(async item => {
+    try {
+      const { data, error } = await supabase.rpc('get_request_status', {
+        p_request_id: item.id, p_guest_token: token,
+      });
+      return !error && data?.[0] ? { ...item, ...data[0] } : item;
+    } catch { return item; }
+  }));
+  // Keep the complete local history, but show only requests still awaiting or being performed.
+  localStorage.setItem(guestRequestsKey, JSON.stringify(fetched));
+  const other = fetched.filter(item => item.id !== currentRequest?.id && activeGuestStatuses.has(item.status || 'pending'));
+  otherGuestRequests.replaceChildren();
+  for (const item of other) {
+    const section = document.createElement('section');
+    section.className = 'panel status-panel';
+    section.style.marginBottom = '14px';
+    const heading = document.createElement('p');
+    heading.className = 'eyebrow';
+    heading.textContent = item.request_type === 'karaoke' ? '🎤 KARAOKE REQUEST' : '♫ SONG REQUEST';
+    const title = document.createElement('h3');
+    title.textContent = `${item.artist || ''} — ${item.song || ''}`;
+    const badge = document.createElement('span');
+    badge.className = `status-pill ${item.status || 'pending'}`;
+    badge.textContent = item.status || 'pending';
+    const status = document.createElement('p');
+    status.className = 'muted';
+    status.textContent = item.status === 'playing' ? 'Currently playing / singer called' :
+      item.status === 'accepted' ? 'Approved — waiting in the queue' :
+      item.status === 'cant_find' ? 'DJ needs help locating this version' :
+      'Waiting for DJ approval';
+    section.append(heading, title, badge, status);
+    otherGuestRequests.append(section);
+  }
+}
+
+function startGuestRequestPolling() {
+  if (guestRequestTimer) clearInterval(guestRequestTimer);
+  renderGuestRequests();
+  guestRequestTimer = setInterval(renderGuestRequests, 12000);
+}
+
 let pollTimer = null;
 let requestRealtime = null;
 let readyAnnouncementVersion = null;
@@ -496,6 +560,7 @@ async function loadEvent() {
   await loadRecentPlayed();
   startRecentPlayedPolling();
   restoreLastRequest();
+  startGuestRequestPolling();
   await handlePayPalReturn();
 }
 
@@ -692,6 +757,8 @@ form.addEventListener('submit', async event => {
     etransfer_email: publicEvent?.etransfer_email || null,
   };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
+  saveGuestRequest({ ...currentRequest, status: 'pending' });
+  renderGuestRequests();
   if (submissionType === 'karaoke') {
     pushRegisteredRequestId = null;
     localStorage.removeItem(`dropmysong_push_request_${eventSlug}`);
@@ -728,6 +795,8 @@ async function refreshStatus() {
   const row = data[0];
   currentRequest = { ...currentRequest, ...row };
   localStorage.setItem(`dropmysong_last_${eventSlug}`, JSON.stringify(currentRequest));
+  saveGuestRequest(currentRequest);
+  renderGuestRequests();
   renderCurrentStatus();
 
   if ((currentRequest.request_type || requestType) === 'karaoke' && row.status === 'playing' && readyAnnouncementVersion !== row.updated_at) {
@@ -748,7 +817,7 @@ function renderCurrentStatus() {
   statusBadge.textContent = type === 'karaoke' ? t(`status.karaoke.${currentRequest.status}Label`) : t(`status.${currentRequest.status}`);
   statusBadge.className = `status-pill ${currentRequest.status}`;
   statusText.textContent = t(`status.${type}.${currentRequest.status}`);
-  statusPanel.classList.remove('hidden');
+  statusPanel.classList.toggle('hidden', !activeGuestStatuses.has(currentRequest.status));
   renderPaymentStatus();
   renderLinkPreviewInto(statusLinkPreview, currentRequest.song_url, {
     linked: true,
@@ -765,6 +834,7 @@ function restoreLastRequest() {
   if (!raw) return;
   try {
     currentRequest = JSON.parse(raw);
+    if (!savedGuestRequests().some(item => item.id === currentRequest.id)) saveGuestRequest(currentRequest);
     refreshStatus();
     subscribeToRequestUpdates();
     startPolling();
@@ -978,6 +1048,7 @@ window.addEventListener('beforeunload', () => {
   teardownRequestRealtime();
   stopPolling();
   stopRecentPlayedPolling();
+  if (guestRequestTimer) clearInterval(guestRequestTimer);
 });
 
 loadEvent();
