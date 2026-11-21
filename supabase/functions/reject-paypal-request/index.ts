@@ -17,12 +17,12 @@ function serviceKey(){
     return String(data.default||Object.values(data)[0]||'');
   }catch{return '';}
 }
-const paypalBase=()=>Deno.env.get('DMS_PAYPAL_ENVIRONMENT')?.toLowerCase()==='live'
-  ? 'https://api-m.paypal.com':'https://api-m.sandbox.paypal.com';
+// Sandbox-only test lock. Live credentials remain stored for future use.
+const paypalBase=()=> 'https://api-m.sandbox.paypal.com';
 async function paypalToken(){
-  const id=Deno.env.get('DMS_PAYPAL_CLIENT_ID');
-  const secret=Deno.env.get('DMS_PAYPAL_CLIENT_SECRET');
-  if(!id||!secret)throw Error('PayPal credentials are not configured');
+  const id=Deno.env.get('DMS_PAYPAL_SANDBOX_CLIENT_ID');
+  const secret=Deno.env.get('DMS_PAYPAL_SANDBOX_CLIENT_SECRET');
+  if(!id||!secret)throw Error('Sandbox PayPal credentials are not configured');
   const response=await fetch(paypalBase()+'/v1/oauth2/token',{
     method:'POST',headers:{
       Authorization:'Basic '+btoa(id+':'+secret),
