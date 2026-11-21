@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { ETRANSFER_EMAIL } from './config.js';
+import { ETRANSFER_EMAIL, SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { appBaseUrl, buildGuestUrl, escapeHtml, relativeTime, slugify } from './common.js';
 import { applyTranslations, getLanguage, initI18n, t } from './i18n.js';
 import { hydrateLinkPreviews } from './linkPreview.js';
@@ -1536,6 +1536,27 @@ function normalizeTipOptions(value) {
   return cleaned;
 }
 
+async function checkPayPalSandboxSetup() {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/paypal-payment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ action: 'status' }),
+    });
+    const data = await response.json();
+    if (!response.ok || data?.environment !== 'sandbox') throw Error('Sandbox status check failed');
+    paypalConfiguredValue.textContent = data.ready
+      ? 'PayPal Sandbox — test credentials configured'
+      : 'PayPal Sandbox — missing test credentials (see Supabase Secrets)';
+  } catch {
+    paypalConfiguredValue.textContent = 'PayPal Sandbox — setup status unavailable';
+  }
+}
+
 function syncPaymentSettingsForm() {
   const disabled = !activeEvent;
   paymentSettingsForm.querySelectorAll('input,button').forEach(control => { control.disabled = disabled; });
@@ -1547,7 +1568,8 @@ function syncPaymentSettingsForm() {
   tipsRequiredToggle.checked = !!activeEvent.tips_enabled;
   const options = normalizeTipOptions(activeEvent.tip_options);
   tipOptionInputs.forEach((input, index) => { input.value = options[index]; });
-  paypalConfiguredValue.textContent = t('dashboard.paypalAutomatic');
+  paypalConfiguredValue.textContent = 'Sandbox test mode — checking setup…';
+  void checkPayPalSandboxSetup();
   etransferConfiguredValue.textContent = ETRANSFER_EMAIL;
 }
 
