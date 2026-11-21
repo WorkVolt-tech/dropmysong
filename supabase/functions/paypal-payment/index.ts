@@ -26,16 +26,16 @@ function getDefaultKey(jsonName: string, legacyName: string) {
   }
 }
 
+// Sandbox-only test lock: intentionally ignore saved Live credentials and mode.
+// Restore selectable environments only when the DJ approves a return to Live.
 function paypalBaseUrl() {
-  return (Deno.env.get('DMS_PAYPAL_ENVIRONMENT') || 'sandbox').toLowerCase() === 'live'
-    ? 'https://api-m.paypal.com'
-    : 'https://api-m.sandbox.paypal.com';
+  return 'https://api-m.sandbox.paypal.com';
 }
 
 async function getPayPalAccessToken() {
-  const clientId = Deno.env.get('DMS_PAYPAL_CLIENT_ID') || '';
-  const clientSecret = Deno.env.get('DMS_PAYPAL_CLIENT_SECRET') || '';
-  if (!clientId || !clientSecret) throw new Error('PayPal API credentials are not configured');
+  const clientId = Deno.env.get('DMS_PAYPAL_SANDBOX_CLIENT_ID') || '';
+  const clientSecret = Deno.env.get('DMS_PAYPAL_SANDBOX_CLIENT_SECRET') || '';
+  if (!clientId || !clientSecret) throw new Error('Sandbox PayPal credentials are not configured');
 
   const basic = btoa(`${clientId}:${clientSecret}`);
   const response = await fetch(`${paypalBaseUrl()}/v1/oauth2/token`, {
@@ -181,7 +181,7 @@ async function captureAndConfirm(admin: any, requestRow: any, orderId: string, a
 }
 
 async function verifyWebhook(event: any, req: Request, accessToken: string) {
-  const webhookId = Deno.env.get('DMS_PAYPAL_WEBHOOK_ID') || '';
+  const webhookId = Deno.env.get('DMS_PAYPAL_SANDBOX_WEBHOOK_ID') || '';
   if (!webhookId) throw new Error('PayPal webhook ID is not configured');
 
   const body = {
@@ -290,7 +290,7 @@ export default {
     }
 
     let body: {
-      action?: 'create' | 'capture';
+      action?: 'create' | 'capture' | 'status';
       request_id?: string;
       guest_token?: string;
       order_id?: string;
@@ -299,6 +299,16 @@ export default {
     } = {};
 
     try { body = await req.json(); } catch { return json({ error: 'Invalid request body' }, 400); }
+
+    // Public, non-sensitive check for the guest test setup.
+    if (body.action === 'status') {
+      const ready = Boolean(
+        Deno.env.get('DMS_PAYPAL_SANDBOX_CLIENT_ID') &&
+        Deno.env.get('DMS_PAYPAL_SANDBOX_CLIENT_SECRET') &&
+        Deno.env.get('DMS_PAYPAL_SANDBOX_WEBHOOK_ID')
+      );
+      return json({ environment: 'sandbox', ready });
+    }
 
     if (!body.request_id || !body.guest_token) {
       return json({ error: 'request_id and guest_token are required' }, 400);
